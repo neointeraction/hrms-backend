@@ -1,0 +1,120 @@
+HRM Tool - Backend API Documentation
+Base URL
+http://localhost:5001/api
+
+Authentication
+All protected routes require a valid JWT token in the Authorization header. Header Format: Authorization: Bearer <your_token_here>
+
+Auth Endpoints
+1. Register User
+Creates a new user account. By default, assigns the employee role.
+
+URL: /auth/register
+Method: POST
+Auth Required: No
+Request Body:
+{
+  "email": "user@example.com",
+  "password": "securePassword123",
+  "employeeId": "EMP001",
+  "department": "IT"
+}
+Success Response (201 Created):
+{
+  "message": "User registered successfully"
+}
+Error Response (400 Bad Request):
+{
+  "message": "User already exists"
+}
+2. Login
+Authenticates a user and returns a JWT token along with flattened permissions.
+
+URL: /auth/login
+Method: POST
+Auth Required: No
+Request Body:
+{
+  "email": "user@example.com",
+  "password": "securePassword123"
+}
+Success Response (200 OK):
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+Note: The token payload contains userId and a permissions array.
+3. Get Current User (Me)
+Retrieves profile and permissions for the currently logged-in user.
+
+URL: /auth/me
+Method: GET
+Auth Required: Yes
+Success Response (200 OK):
+{
+  "user": {
+    "_id": "60d5ec...",
+    "email": "user@example.com",
+    "employeeId": "EMP001",
+    "department": "IT",
+    "roles": ["employee"]
+  },
+  "permissions": [
+    "employee:view_self",
+    "employee:update_self",
+    "task:create",
+    ...
+  ]
+}
+HR / Role-Based Endpoints
+4. View Own Profile
+Accessible by any authenticated user.
+
+URL: /hr/profile/self
+Method: GET
+Auth Required: Yes
+Success Response (200 OK):
+{
+  "message": "Access granted: View Own Profile",
+  "user": { ...token_payload... }
+}
+5. View All Employees
+Requires employee:view_all OR admin:full_access permission (e.g., HR Executive, Admin).
+
+URL: /hr/employees
+Method: GET
+Auth Required: Yes
+Success Response (200 OK):
+{
+  "message": "Access granted: View All Employee Data",
+  "data": [
+    { "id": 1, "name": "John Doe", "role": "Employee" },
+    ...
+  ]
+}
+Error Response (403 Forbidden):
+{
+  "message": "Access denied: Insufficient permissions"
+}
+6. Create New User (Admin)
+Requires admin:full_access OR hr:user_onboard permission.
+
+URL: /hr/users
+Method: POST
+Auth Required: Yes
+Request Body: Same as Register endpoint.
+Success Response (201 Created):
+{
+  "message": "Access granted: Create New User",
+  "createdUser": { ... }
+}
+Permissions Reference
+Permission	Description
+employee:view_self	View own profile
+employee:update_self	Update own profile
+employee:view_all	View all employees (HR)
+payroll:view_self	View own payroll
+payroll:view_all	View all payrolls (HR)
+task:create	Create tasks
+task:view	View tasks
+admin:full_access	Super admin access
+hr:user_onboard	Create new users
