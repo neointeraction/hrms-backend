@@ -177,6 +177,21 @@ exports.updateEmployee = async (req, res) => {
       });
     }
 
+    // IMPORTANT: Update User role if changed
+    // This ensures the authentication system reflects the new role
+    if (req.body.role) {
+      const newRole = await Role.findOne({ name: req.body.role });
+      if (newRole) {
+        await User.findByIdAndUpdate(employee.user, {
+          roles: [newRole._id],
+        });
+      } else {
+        console.warn(
+          `Role '${req.body.role}' not found, User roles not updated`
+        );
+      }
+    }
+
     res.json(employee);
   } catch (err) {
     console.error(err);

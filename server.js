@@ -21,12 +21,25 @@ mongoose
 // Routes
 const authRoutes = require("./routes/auth.routes");
 const hrRoutes = require("./routes/hr.routes");
+const employeeRoutes = require("./routes/employee.routes");
 const adminRoutes = require("./routes/admin.routes");
+const attendanceRoutes = require("./routes/attendance.routes");
+const timesheetRoutes = require("./routes/timesheet.routes");
+const timeCorrectionRoutes = require("./routes/timeCorrection.routes");
+const auditRoutes = require("./routes/audit.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/hr", hrRoutes);
+app.use("/api/employees", employeeRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/employees", require("./routes/employee.routes"));
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/timesheet", timesheetRoutes);
+app.use("/api/time-correction", timeCorrectionRoutes);
+app.use("/api/audit", auditRoutes);
+app.use("/api/leave", require("./routes/leave.routes"));
+app.use("/api/payroll", require("./routes/payroll.routes"));
+app.use("/api/projects", require("./routes/project.routes"));
+app.use("/api/tasks", require("./routes/task.routes"));
 
 app.get("/", (req, res) => {
   res.send("HRM RBAC API is running");

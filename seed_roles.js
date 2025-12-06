@@ -3,13 +3,13 @@ const Role = require("./models/Role");
 require("dotenv").config();
 
 const roles = [
-  { name: "admin" },
-  { name: "hr" },
-  { name: "accountant" },
-  { name: "pm" },
-  { name: "employee" },
-  { name: "intern" },
-  { name: "consultant" },
+  { name: "Admin" },
+  { name: "HR" },
+  { name: "Accountant" },
+  { name: "Project Manager" },
+  { name: "Employee" },
+  { name: "Intern" },
+  { name: "Consultant" },
 ];
 
 async function seedRoles() {

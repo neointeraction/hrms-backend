@@ -4,8 +4,8 @@ const Permission = require("./models/Permission");
 require("dotenv").config();
 
 const roleMatrix = {
-  admin: ["*"], // All permissions
-  hr: [
+  Admin: ["*"], // All permissions
+  HR: [
     "employee:create",
     "employee:read",
     "employee:update",
@@ -18,7 +18,7 @@ const roleMatrix = {
     "task:view_all",
     "ticket:manage",
   ],
-  accountant: [
+  Accountant: [
     "employee:read",
     "payroll:manage",
     "attendance:view_all",
@@ -27,7 +27,7 @@ const roleMatrix = {
     "report:view_all",
     "ticket:manage",
   ],
-  pm: [
+  "Project Manager": [
     "employee:read",
     "payroll:view_team",
     "attendance:approve_team",
@@ -37,7 +37,7 @@ const roleMatrix = {
     "task:manage",
     "ticket:view_team",
   ],
-  employee: [
+  Employee: [
     "employee:read_self",
     "employee:update_self",
     "payroll:view_self",
@@ -48,7 +48,7 @@ const roleMatrix = {
     "task:view_assigned",
     "ticket:manage_self",
   ],
-  intern: [
+  Intern: [
     "employee:read_self",
     "employee:update_self",
     // No payroll
@@ -59,7 +59,7 @@ const roleMatrix = {
     "task:view_assigned",
     "ticket:manage_self",
   ],
-  consultant: [
+  Consultant: [
     "employee:read_self",
     "employee:update_self",
     // No payroll
