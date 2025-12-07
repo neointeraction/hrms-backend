@@ -76,12 +76,10 @@ exports.login = async (req, res) => {
 
     // Check if user is active
     if (user.status !== "active") {
-      return res
-        .status(403)
-        .json({
-          message:
-            "Your account has been deactivated. Please contact your administrator.",
-        });
+      return res.status(403).json({
+        message:
+          "Your account has been deactivated. Please contact your administrator.",
+      });
     }
 
     // Flatten permissions
@@ -97,6 +95,7 @@ exports.login = async (req, res) => {
     const payload = {
       userId: user._id,
       permissions: permissionsArray,
+      roles: user.roles.map((role) => role.name),
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
@@ -141,13 +140,30 @@ exports.getMe = async (req, res) => {
       });
     });
 
+    // Fetch associated Employee record to get profile picture
+    const Employee = require("../models/Employee");
+    const employee = await Employee.findOne({ user: user._id });
+
     res.json({
       user: {
         _id: user._id,
+        name: user.name,
         email: user.email,
         employeeId: user.employeeId,
         department: user.department,
+        designation: employee ? employee.designation : null,
         roles: user.roles.map((r) => r.name),
+        avatar:
+          employee && employee.profilePicture
+            ? `http://localhost:5001/${employee.profilePicture}`
+            : user.name
+            ? user.name
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .substring(0, 2)
+                .toUpperCase()
+            : "??",
       },
       permissions: Array.from(permissions),
     });

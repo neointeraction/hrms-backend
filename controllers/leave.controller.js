@@ -11,11 +11,15 @@ const calculateTotalDays = (startDate, endDate) => {
   return diffDays;
 };
 
+// Helper: Check role
+const hasRole = (userRoles, role) => userRoles && userRoles.includes(role);
+
 // Apply for Leave
 exports.applyLeave = async (req, res) => {
   try {
     const { type, startDate, endDate, reason } = req.body;
     const userId = req.user.userId;
+    const userRoles = req.user.roles || [];
 
     // Find employee associated with user
     const employee = await Employee.findOne({ user: userId });
@@ -33,18 +37,14 @@ exports.applyLeave = async (req, res) => {
     // Initial Workflow Status based on Role
     let workflowStatus = "Pending Approval";
 
-    // Determine workflow based on user role (need to fetch user role if not in req.user properly)
-    // Assuming req.user.role is populated from auth middleware
-    const userRole = req.user.role;
-
-    if (userRole === "Employee") {
-      workflowStatus = "Pending PM";
-    } else if (userRole === "Intern") {
+    if (hasRole(userRoles, "Project Manager")) {
       workflowStatus = "Pending HR";
-    } else if (userRole === "Consultant") {
+    } else if (hasRole(userRoles, "Intern")) {
+      workflowStatus = "Pending HR";
+    } else if (hasRole(userRoles, "Consultant")) {
       workflowStatus = "Pending PM";
-    } else if (userRole === "Project Manager") {
-      workflowStatus = "Pending HR"; // PM applies, goes to HR? OR Auto-approve? Assuming HR.
+    } else if (hasRole(userRoles, "Employee")) {
+      workflowStatus = "Pending PM";
     }
 
     const newLeave = new Leave({
@@ -91,18 +91,24 @@ exports.getMyLeaves = async (req, res) => {
 // Get Pending Approvals (for Managers/HR)
 exports.getPendingApprovals = async (req, res) => {
   try {
-    const userRole = req.user.role;
+    const userRoles = req.user.roles || [];
     let query = { status: "Pending" };
+    let authorized = false;
 
-    if (userRole === "Project Manager") {
+    // HR and Admin allow viewing ALL pending requests
+    if (hasRole(userRoles, "HR") || hasRole(userRoles, "Admin")) {
+      // No workflowStatus filter needed, they see all 'Pending' leaves
+      // Or if we want to be specific:
+      // query.workflowStatus = { $in: ["Pending PM", "Pending HR"] };
+      // Let's allow them to see all to be safe.
+      authorized = true;
+    } else if (hasRole(userRoles, "Project Manager")) {
       // PM sees leaves that are 'Pending PM'
-      // In a real app, query should filter by team members.
-      // For MVP/Demo, PM sees all 'Pending PM' requests.
       query.workflowStatus = "Pending PM";
-    } else if (userRole === "HR" || userRole === "Admin") {
-      // HR sees leaves that are 'Pending HR'
-      query.workflowStatus = "Pending HR";
-    } else {
+      authorized = true;
+    }
+
+    if (!authorized) {
       return res
         .status(403)
         .json({ message: "Unauthorized to view approvals" });
@@ -124,63 +130,76 @@ exports.approveLeave = async (req, res) => {
   try {
     const { id } = req.params;
     const { comments } = req.body;
-    const approverRole = req.user.role;
+    const userRoles = req.user.roles || [];
     const approverId = req.user.userId;
+
+    console.log(`DEBUG: approveLeave id=${id} roles=${userRoles}`);
 
     const leave = await Leave.findById(id).populate("employee");
     if (!leave) {
       return res.status(404).json({ message: "Leave request not found" });
     }
 
-    // Logic for workflow transition
-    if (
-      leave.workflowStatus === "Pending PM" &&
-      approverRole === "Project Manager"
-    ) {
-      // PM Approves -> Moves to HR for Employees, or Approved for Consultant?
-      // Requirement: "Employee -> PM -> HR approval", "Consultant -> PM approval"
+    console.log(`DEBUG: leave.workflowStatus=${leave.workflowStatus}`);
 
-      // Check employee role (we need to access User model or store role in Employee or Leave)
-      // We populated employee, let's look up the user to get the role if needed, or assume from context.
-      // Let's fetch the user associated with the employee to check their role.
-      const employeeUser = await User.findById(leave.employee.user);
-      const requestorRole = employeeUser ? employeeUser.role : "Employee";
+    // Role-based Approval Logic
+    let approved = false;
+    let nextStatus = "";
+    const isHR = hasRole(userRoles, "HR") || hasRole(userRoles, "Admin");
+    const isPM = hasRole(userRoles, "Project Manager");
 
-      if (requestorRole === "Consultant") {
-        leave.status = "Approved";
-        leave.workflowStatus = "Approved";
-      } else {
-        leave.workflowStatus = "Pending HR";
+    if (leave.workflowStatus === "Pending PM") {
+      if (isHR) {
+        // HR Direct Approval (Override)
+        approved = true;
+        nextStatus = "Approved"; // HR approval is final
+      } else if (isPM) {
+        approved = true;
+        // PM Approval Logic
+        const employeeUser = await User.findById(leave.employee.user).populate(
+          "roles"
+        );
+        const employeeRoles = employeeUser
+          ? employeeUser.roles.map((r) => r.name)
+          : ["Employee"];
+
+        if (hasRole(employeeRoles, "Consultant")) {
+          nextStatus = "Approved";
+        } else {
+          nextStatus = "Pending HR";
+        }
       }
-
-      leave.approvals.push({
-        approver: approverId,
-        role: "Project Manager",
-        status: "Approved",
-        comments,
-      });
     } else if (
-      leave.workflowStatus === "Pending HR" &&
-      (approverRole === "HR" || approverRole === "Admin")
+      leave.workflowStatus === "Pending HR" ||
+      leave.workflowStatus === "Pending Approval"
     ) {
+      // 'Pending Approval' is a fallback status for legacy/unknown role requests. Treat as Pending HR.
+      if (isHR) {
+        approved = true;
+        nextStatus = "Approved";
+      }
+    }
+
+    if (!approved) {
+      console.log("DEBUG: Approval failed. conditions not met.");
+      return res.status(400).json({
+        message: "Invalid approval action for current status or role",
+      });
+    }
+
+    if (nextStatus === "Approved") {
       leave.status = "Approved";
       leave.workflowStatus = "Approved";
-      leave.approvals.push({
-        approver: approverId,
-        role: "HR",
-        status: "Approved",
-        comments,
-      });
-
-      // TODO: Update Leave Balance Here
-      // TODO: DEDUCTIONS UPDATE PAYROLL AUTOMATICALLY (Mock integration)
     } else {
-      return res
-        .status(400)
-        .json({
-          message: "Invalid approval action for current status or role",
-        });
+      leave.workflowStatus = nextStatus;
     }
+
+    leave.approvals.push({
+      approver: approverId,
+      role: isHR ? "HR" : "Project Manager", // Record who actually acted
+      status: "Approved",
+      comments,
+    });
 
     await leave.save();
     res.json({ message: "Leave approved successfully", leave });
@@ -196,18 +215,45 @@ exports.rejectLeave = async (req, res) => {
     const { id } = req.params;
     const { comments } = req.body;
     const approverId = req.user.userId;
-    const approverRole = req.user.role;
+    const userRoles = req.user.roles || [];
 
     const leave = await Leave.findById(id);
     if (!leave) {
       return res.status(404).json({ message: "Leave request not found" });
     }
 
+    // Validate permission to reject based on status
+    let canReject = false;
+    let actingRole = "";
+    const isHR = hasRole(userRoles, "HR") || hasRole(userRoles, "Admin");
+    const isPM = hasRole(userRoles, "Project Manager");
+
+    if (leave.workflowStatus === "Pending PM") {
+      if (isHR) {
+        canReject = true;
+        actingRole = "HR";
+      } else if (isPM) {
+        canReject = true;
+        actingRole = "Project Manager";
+      }
+    } else if (leave.workflowStatus === "Pending HR") {
+      if (isHR) {
+        canReject = true;
+        actingRole = "HR";
+      }
+    }
+
+    if (!canReject) {
+      return res
+        .status(403)
+        .json({ message: "Unauthorized to reject this leave request" });
+    }
+
     leave.status = "Rejected";
     leave.workflowStatus = "Rejected";
     leave.approvals.push({
       approver: approverId,
-      role: approverRole,
+      role: actingRole,
       status: "Rejected",
       comments,
     });

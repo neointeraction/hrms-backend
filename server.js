@@ -18,6 +18,9 @@ mongoose
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
+// Serve Uploads
+app.use("/uploads", express.static("uploads"));
+
 // Routes
 const authRoutes = require("./routes/auth.routes");
 const hrRoutes = require("./routes/hr.routes");

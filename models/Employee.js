@@ -16,6 +16,7 @@ const employeeSchema = new mongoose.Schema(
     lastName: { type: String, required: true },
     nickName: { type: String },
     email: { type: String, required: true, unique: true },
+    profilePicture: { type: String },
 
     // Work Information
     department: { type: String },

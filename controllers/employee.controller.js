@@ -22,6 +22,8 @@ exports.createEmployee = async (req, res) => {
       ...otherData
     } = req.body;
 
+    const profilePicture = req.file ? req.file.path : null;
+
     // 1. Check if user/employee already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -59,6 +61,19 @@ exports.createEmployee = async (req, res) => {
     // 4. Clean otherData - remove empty strings for ObjectId and enum fields
     const cleanedData = { ...otherData };
 
+    // Parse JSON fields (Handle FormData strings)
+    const jsonFields = ["workExperience", "education", "dependents", "tags"];
+    jsonFields.forEach((field) => {
+      if (typeof cleanedData[field] === "string") {
+        try {
+          cleanedData[field] = JSON.parse(cleanedData[field]);
+        } catch (e) {
+          console.error(`Failed to parse ${field}`, e);
+          cleanedData[field] = []; // Fallback to empty array
+        }
+      }
+    });
+
     // Remove empty string for reportingManager (ObjectId field)
     if (cleanedData.reportingManager === "") {
       delete cleanedData.reportingManager;
@@ -85,8 +100,9 @@ exports.createEmployee = async (req, res) => {
       lastName,
       email,
       role: roleName,
+      profilePicture, // Add profile picture path
       ...cleanedData,
-      addedBy: req.user ? req.user.id : null, // Assuming auth middleware populates req.user
+      addedBy: req.user ? req.user.id : null,
     });
 
     await newEmployee.save({ session });
@@ -95,7 +111,7 @@ exports.createEmployee = async (req, res) => {
     res.status(201).json(newEmployee);
   } catch (err) {
     await session.abortTransaction();
-    console.error(err);
+    console.error("Create Employee Error:", err);
     res.status(500).json({ message: err.message || "Server error" });
   } finally {
     session.endSession();
@@ -106,7 +122,7 @@ exports.createEmployee = async (req, res) => {
 exports.getEmployees = async (req, res) => {
   try {
     const employees = await Employee.find()
-      .populate("user", "status roles") // Populate user status
+      .populate("user", "status roles")
       .populate("reportingManager", "firstName lastName");
     res.json(employees);
   } catch (err) {
@@ -131,11 +147,28 @@ exports.getEmployeeById = async (req, res) => {
   }
 };
 
-// Update employee
+// Update Employee
 exports.updateEmployee = async (req, res) => {
   try {
     // Clean data - remove empty strings for ObjectId and enum fields
     const cleanedData = { ...req.body };
+
+    if (req.file) {
+      cleanedData.profilePicture = req.file.path;
+    }
+
+    // Parse JSON fields (Handle FormData strings)
+    const jsonFields = ["workExperience", "education", "dependents", "tags"];
+    jsonFields.forEach((field) => {
+      if (typeof cleanedData[field] === "string") {
+        try {
+          cleanedData[field] = JSON.parse(cleanedData[field]);
+        } catch (e) {
+          console.error(`Failed to parse ${field}`, e);
+          cleanedData[field] = []; // Fallback to empty array
+        }
+      }
+    });
 
     // Remove empty string for reportingManager (ObjectId field)
     if (cleanedData.reportingManager === "") {
@@ -178,7 +211,6 @@ exports.updateEmployee = async (req, res) => {
     }
 
     // IMPORTANT: Update User role if changed
-    // This ensures the authentication system reflects the new role
     if (req.body.role) {
       const newRole = await Role.findOne({ name: req.body.role });
       if (newRole) {
@@ -194,7 +226,7 @@ exports.updateEmployee = async (req, res) => {
 
     res.json(employee);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Update Employee Error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };
