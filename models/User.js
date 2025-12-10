@@ -21,6 +21,21 @@ const userSchema = new mongoose.Schema({
   department: {
     type: String,
   },
+  designation: {
+    type: String,
+  },
+  doj: {
+    type: Date,
+  },
+  pan: {
+    type: String,
+  },
+  bankName: {
+    type: String,
+  },
+  bankAccountNo: {
+    type: String,
+  },
   status: {
     type: String,
     enum: ["active", "inactive"],
@@ -30,6 +45,18 @@ const userSchema = new mongoose.Schema({
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Role",
+    },
+  ],
+  loginHistory: [
+    {
+      timestamp: { type: Date, default: Date.now },
+      ip: String,
+      device: String,
+      location: {
+        lat: Number,
+        lng: Number,
+        address: String,
+      },
     },
   ],
 });

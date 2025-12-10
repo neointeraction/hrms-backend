@@ -30,6 +30,7 @@ const attendanceRoutes = require("./routes/attendance.routes");
 const timesheetRoutes = require("./routes/timesheet.routes");
 const timeCorrectionRoutes = require("./routes/timeCorrection.routes");
 const auditRoutes = require("./routes/audit.routes");
+const notificationRoutes = require("./routes/notification.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/hr", hrRoutes);
@@ -43,6 +44,9 @@ app.use("/api/leave", require("./routes/leave.routes"));
 app.use("/api/payroll", require("./routes/payroll.routes"));
 app.use("/api/projects", require("./routes/project.routes"));
 app.use("/api/tasks", require("./routes/task.routes"));
+app.use("/api/holidays", require("./routes/holiday.routes"));
+app.use("/api/leave-policies", require("./routes/leavePolicy.routes"));
+app.use("/api/notifications", notificationRoutes);
 
 app.get("/", (req, res) => {
   res.send("HRM RBAC API is running");

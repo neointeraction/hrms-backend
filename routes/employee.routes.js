@@ -28,6 +28,9 @@ router.post(
   upload.single("profilePicture"),
   employeeController.createEmployee
 );
+// Hierarchy route MUST be before /:id to avoid conflict if :id is generic (though here it is okay, better safe)
+router.get("/hierarchy", employeeController.getHierarchy);
+router.get("/upcoming-events", employeeController.getUpcomingEvents);
 router.get("/", employeeController.getEmployees);
 router.get("/:id", employeeController.getEmployeeById);
 router.put(

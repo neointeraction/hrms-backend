@@ -230,3 +230,118 @@ exports.updateEmployee = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
+// Get Employee Hierarchy (Simplified list for tree building)
+exports.getHierarchy = async (req, res) => {
+  try {
+    const employees = await Employee.find(
+      { role: { $nin: ["Admin", "Super Admin"] } },
+      {
+        firstName: 1,
+        lastName: 1,
+        designation: 1,
+        profilePicture: 1,
+        reportingManager: 1,
+        employeeId: 1,
+        role: 1,
+      }
+    ).populate("reportingManager", "firstName lastName");
+    res.json(employees);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+// Get Upcoming Birthdays and Work Anniversaries
+exports.getUpcomingEvents = async (req, res) => {
+  try {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const next30Days = new Date();
+    next30Days.setDate(today.getDate() + 30);
+
+    const employees = await Employee.find(
+      { employeeStatus: "Active" }, // Only active employees
+      {
+        firstName: 1,
+        lastName: 1,
+        dateOfBirth: 1,
+        dateOfJoining: 1,
+        profilePicture: 1,
+        designation: 1,
+      }
+    ).lean();
+
+    const upcomingBirthdays = [];
+    const upcomingAnniversaries = [];
+
+    employees.forEach((emp) => {
+      // 1. Check Birthday
+      if (emp.dateOfBirth) {
+        const dob = new Date(emp.dateOfBirth);
+        // Create date for this year
+        let nextBirthday = new Date(currentYear, dob.getMonth(), dob.getDate());
+
+        // If birthday has passed this year, check next year
+        if (nextBirthday < today) {
+          nextBirthday.setFullYear(currentYear + 1);
+        }
+
+        // Check if within range
+        if (nextBirthday >= today && nextBirthday <= next30Days) {
+          upcomingBirthdays.push({
+            id: emp._id,
+            name: `${emp.firstName} ${emp.lastName}`,
+            date: nextBirthday, // Return the computed date for sorting
+            originalDate: emp.dateOfBirth,
+            type: "Birthday",
+            profilePicture: emp.profilePicture,
+            designation: emp.designation,
+          });
+        }
+      }
+
+      // 2. Check Work Anniversary
+      if (emp.dateOfJoining) {
+        const doj = new Date(emp.dateOfJoining);
+        let nextAnniversary = new Date(
+          currentYear,
+          doj.getMonth(),
+          doj.getDate()
+        );
+
+        if (nextAnniversary < today) {
+          nextAnniversary.setFullYear(currentYear + 1);
+        }
+
+        if (nextAnniversary >= today && nextAnniversary <= next30Days) {
+          const years = nextAnniversary.getFullYear() - doj.getFullYear();
+          if (years > 0) {
+            upcomingAnniversaries.push({
+              id: emp._id,
+              name: `${emp.firstName} ${emp.lastName}`,
+              date: nextAnniversary,
+              originalDate: emp.dateOfJoining,
+              years: years,
+              type: "Anniversary",
+              profilePicture: emp.profilePicture,
+              designation: emp.designation,
+            });
+          }
+        }
+      }
+    });
+
+    // Sort by date sort((a, b) => a.date - b.date)
+    upcomingBirthdays.sort((a, b) => a.date - b.date);
+    upcomingAnniversaries.sort((a, b) => a.date - b.date);
+
+    res.json({
+      birthdays: upcomingBirthdays,
+      anniversaries: upcomingAnniversaries,
+    });
+  } catch (err) {
+    console.error("Get upcoming events error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

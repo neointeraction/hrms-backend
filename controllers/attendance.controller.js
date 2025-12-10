@@ -79,6 +79,9 @@ exports.clockOut = async (req, res) => {
     // Update time entry
     timeEntry.clockOut = new Date();
     timeEntry.status = "completed";
+    if (req.body.completedTasks) {
+      timeEntry.completedTasks = req.body.completedTasks;
+    }
     await timeEntry.save(); // Pre-save hook will calculate totalHours
 
     // Audit log
@@ -90,7 +93,12 @@ exports.clockOut = async (req, res) => {
       employee: employee._id,
       changes: {
         old: { status: "active" },
-        new: { status: "completed", clockOut: timeEntry.clockOut, totalHours: timeEntry.totalHours },
+        new: {
+          status: "completed",
+          clockOut: timeEntry.clockOut,
+          totalHours: timeEntry.totalHours,
+          completedTasks: timeEntry.completedTasks,
+        },
       },
       metadata: { action: "clock_out" },
     });

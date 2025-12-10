@@ -5,7 +5,7 @@ const auditLogSchema = new mongoose.Schema(
     entityType: {
       type: String,
       required: true,
-      enum: ["TimeEntry", "Timesheet", "TimeCorrection"],
+      enum: ["TimeEntry", "Timesheet", "TimeCorrection", "User"],
     },
     entityId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -14,7 +14,16 @@ const auditLogSchema = new mongoose.Schema(
     action: {
       type: String,
       required: true,
-      enum: ["create", "update", "delete", "approve", "reject", "submit"],
+      enum: [
+        "create",
+        "update",
+        "delete",
+        "approve",
+        "reject",
+        "submit",
+        "login",
+        "logout",
+      ],
     },
     performedBy: {
       type: mongoose.Schema.Types.ObjectId,

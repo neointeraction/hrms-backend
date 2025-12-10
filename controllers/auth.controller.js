@@ -102,6 +102,54 @@ exports.login = async (req, res) => {
       expiresIn: "1h",
     });
 
+    // Track Login History
+    const { location } = req.body; // Expect { lat, lng } from client
+    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+    const device = req.headers["user-agent"];
+
+    user.loginHistory.push({
+      ip,
+      device,
+      location: location
+        ? {
+            lat: location.lat,
+            lng: location.lng,
+          }
+        : undefined, // Only save if provided
+    });
+
+    // Keep only last 50 logins
+    if (user.loginHistory.length > 50) {
+      user.loginHistory = user.loginHistory.slice(-50);
+    }
+
+    await user.save();
+
+    // Log Audit Entry
+    // We import logAudit from utils/auditLogger (assuming it exists or directly using model)
+    // To keep it simple and avoid circular dependencies if utils uses models, we can use AuditLog model directly or require at top
+    const AuditLog = require("../models/AuditLog");
+    await AuditLog.create({
+      entityType: "User",
+      entityId: user._id,
+      action: "login",
+      performedBy: user._id,
+      // Try to link to employee if possible (user.employeeId is a string, not ObjectId, need to find Employee)
+      // For now, simpler to just log user. We can populate employee if we fetch it.
+      // We can fetch employee briefly
+      employee: (
+        await require("../models/Employee").findOne({ user: user._id })
+      )?._id,
+      metadata: {
+        ip,
+        device,
+        location: location
+          ? { lat: location.lat, lng: location.lng }
+          : undefined,
+      },
+      ipAddress: ip,
+    });
+
     res.json({ token });
   } catch (err) {
     console.error(err);

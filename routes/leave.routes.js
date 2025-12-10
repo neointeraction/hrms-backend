@@ -18,6 +18,12 @@ router.get("/pending-approvals", leaveController.getPendingApprovals);
 // Approve Leave
 router.put("/:id/approve", leaveController.approveLeave);
 
+// Get Employees Currently on Leave
+router.get("/active", leaveController.getEmployeesOnLeave);
+
+// Get Leave Stats
+router.get("/stats", leaveController.getLeaveStats);
+
 // Reject Leave
 router.put("/:id/reject", leaveController.rejectLeave);
 

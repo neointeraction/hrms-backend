@@ -33,6 +33,7 @@ const timeEntrySchema = new mongoose.Schema(
       enum: ["active", "completed"],
       default: "active",
     },
+    completedTasks: String,
     notes: String,
   },
   { timestamps: true }

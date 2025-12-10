@@ -187,13 +187,22 @@ exports.deleteEntry = async (req, res) => {
   }
 };
 
+const { createNotification } = require("./notification.controller");
+
+// ... existing code ...
+
 // Submit Timesheets for Approval
 exports.submitTimesheets = async (req, res) => {
   try {
     const { userId } = req.user;
     const { weekEnding } = req.body;
 
-    const employee = await Employee.findOne({ user: userId });
+    // Populate reportingManager to notify them
+    const employee = await Employee.findOne({ user: userId }).populate({
+      path: "reportingManager",
+      populate: { path: "user" },
+    });
+
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
@@ -224,6 +233,19 @@ exports.submitTimesheets = async (req, res) => {
         submittedAt: new Date(),
       }
     );
+
+    // Trigger Notification to Manager
+    if (employee.reportingManager && employee.reportingManager.user) {
+      await createNotification({
+        recipient: employee.reportingManager.user._id,
+        type: "TIMESHEET",
+        title: "Timesheet Submitted",
+        message: `${employee.firstName} ${
+          employee.lastName
+        } has submitted timesheets for week ending ${weekEnd.toLocaleDateString()}.`,
+        relatedId: timesheets[0]._id, // Link to one of them or generic?
+      });
+    }
 
     // Audit log for submission
     for (const timesheet of timesheets) {
@@ -345,34 +367,61 @@ exports.rejectTimesheet = async (req, res) => {
         .json({ message: "Comments required for rejection" });
     }
 
-    const timesheet = await Timesheet.findById(id);
+    // Assuming 'status' is 'rejected' and 'rejectionReason' is 'comments' for this function
+    // And 'approverId' is 'userId'
+    const status = "rejected";
+    const rejectionReason = comments;
+    const approverId = userId;
+
+    const timesheet = await Timesheet.findByIdAndUpdate(
+      id,
+      {
+        status,
+        rejectionReason: status === "rejected" ? rejectionReason : undefined,
+        approvedBy: status === "approved" ? approverId : undefined, // This will be undefined for rejection
+        approvedAt: status === "approved" ? new Date() : undefined, // This will be undefined for rejection
+        reviewedBy: approverId, // Set reviewedBy for both approval/rejection
+        reviewedAt: new Date(),
+        reviewComments: rejectionReason, // Set reviewComments for rejection
+      },
+      { new: true }
+    ).populate({
+      path: "employee",
+      populate: { path: "user" }, // Nested populate to get User ID
+    });
+
     if (!timesheet) {
       return res.status(404).json({ message: "Timesheet not found" });
     }
 
-    if (timesheet.status !== "submitted") {
-      return res
-        .status(400)
-        .json({ message: "Timesheet is not submitted for approval" });
+    // Trigger Notification
+    if (status === "approved" || status === "rejected") {
+      if (timesheet.employee && timesheet.employee.user) {
+        await createNotification({
+          recipient: timesheet.employee.user._id,
+          type: "TIMESHEET",
+          title: `Timesheet ${status === "approved" ? "Approved" : "Rejected"}`,
+          message: `Your timesheet for week ending ${new Date(
+            timesheet.weekEnding
+          ).toLocaleDateString()} has been ${
+            status === "approved" ? "approved" : "rejected"
+          }.`,
+          relatedId: timesheet._id,
+        });
+      }
     }
-
-    timesheet.status = "rejected";
-    timesheet.reviewedBy = userId;
-    timesheet.reviewedAt = new Date();
-    timesheet.reviewComments = comments;
-    await timesheet.save();
 
     // Audit log
     await createAuditLog({
       entityType: "Timesheet",
       entityId: timesheet._id,
-      action: "reject",
+      action: "reject", // Action remains 'reject' for this function
       performedBy: userId,
       employee: timesheet.employee,
       metadata: {
         project: timesheet.project,
         hours: timesheet.hours,
-        comments,
+        comments: rejectionReason, // Use rejectionReason for comments
       },
     });
 

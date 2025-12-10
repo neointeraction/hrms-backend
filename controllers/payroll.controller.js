@@ -124,12 +124,20 @@ exports.getPayrollList = async (req, res) => {
   }
 };
 
+const { createNotification } = require("./notification.controller");
+
+// ... existing code ...
+
 exports.updatePayrollStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body; // Approved, Paid
 
-    const payroll = await Payroll.findById(id);
+    const payroll = await Payroll.findById(id).populate({
+      path: "employee",
+      populate: { path: "user" },
+    });
+
     if (!payroll)
       return res.status(404).json({ message: "Payroll record not found" });
 
@@ -142,6 +150,18 @@ exports.updatePayrollStatus = async (req, res) => {
     }
 
     await payroll.save();
+
+    // Notify Employee on Paid
+    if (status === "Paid" && payroll.employee && payroll.employee.user) {
+      await createNotification({
+        recipient: payroll.employee.user._id,
+        type: "PAYROLL",
+        title: "Payslip Generated",
+        message: `Your payslip for ${payroll.month} ${payroll.year} has been generated and marked as Paid.`,
+        relatedId: payroll._id,
+      });
+    }
+
     res.json({ message: `Payroll marked as ${status}`, payroll });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
