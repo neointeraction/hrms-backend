@@ -85,7 +85,15 @@ exports.askQuestion = async (req, res) => {
     res.json({ answer });
   } catch (err) {
     console.error("AI Question Error:", err);
-    res.status(500).json({ message: "Server error during AI processing" });
+    console.error("Error specifics:", err.message, err.stack);
+    if (err.message.includes("AI Service is not initialized")) {
+      return res
+        .status(503)
+        .json({ message: "AI Service unavailable. Check API Key." });
+    }
+    res
+      .status(500)
+      .json({ message: "Server error during AI processing: " + err.message });
   }
 };
 
