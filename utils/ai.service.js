@@ -10,7 +10,7 @@ const initializeAI = () => {
   }
   genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash-preview-09-2025",
+    model: "gemini-pro",
   });
 };
 
