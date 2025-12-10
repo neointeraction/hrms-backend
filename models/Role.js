@@ -6,6 +6,11 @@ const roleSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Tenant",
+    // Required for tenant-specific roles, null for platform roles (e.g., Super Admin)
+  },
   permissions: [
     {
       type: mongoose.Schema.Types.ObjectId,
@@ -13,5 +18,8 @@ const roleSchema = new mongoose.Schema({
     },
   ],
 });
+
+// Compound index: role names unique per tenant
+roleSchema.index({ tenantId: 1, name: 1 }, { unique: true });
 
 module.exports = mongoose.model("Role", roleSchema);

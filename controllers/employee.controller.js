@@ -24,21 +24,29 @@ exports.createEmployee = async (req, res) => {
 
     const profilePicture = req.file ? req.file.path : null;
 
-    // 1. Check if user/employee already exists
-    const existingUser = await User.findOne({ email });
+    // Get tenant context
+    if (!req.user || !req.user.tenantId) {
+      throw new Error("No tenant context found");
+    }
+    const tenantId = req.user.tenantId;
+
+    // 1. Check if user/employee already exists in this tenant
+    const existingUser = await User.findOne({ email, tenantId });
     if (existingUser) {
-      throw new Error("User with this email already exists");
+      throw new Error(
+        "User with this email already exists in your organization"
+      );
     }
 
-    const existingEmp = await Employee.findOne({ employeeId });
+    const existingEmp = await Employee.findOne({ employeeId, tenantId });
     if (existingEmp) {
-      throw new Error("Employee ID already exists");
+      throw new Error("Employee ID already exists in your organization");
     }
 
-    // 2. Find Role ID
-    const role = await Role.findOne({ name: roleName });
+    // 2. Find Role ID within tenant
+    const role = await Role.findOne({ name: roleName, tenantId });
     if (!role) {
-      throw new Error(`Role '${roleName}' not found`);
+      throw new Error(`Role '${roleName}' not found in your organization`);
     }
 
     // 3. Create User Account
@@ -52,6 +60,7 @@ exports.createEmployee = async (req, res) => {
       email,
       passwordHash,
       employeeId,
+      tenantId,
       roles: [role._id],
       status: "active",
     });
@@ -95,6 +104,7 @@ exports.createEmployee = async (req, res) => {
     // 5. Create Employee Profile
     const newEmployee = new Employee({
       user: newUser._id,
+      tenantId,
       employeeId,
       firstName,
       lastName,
@@ -121,9 +131,24 @@ exports.createEmployee = async (req, res) => {
 // Get all employees
 exports.getEmployees = async (req, res) => {
   try {
-    const employees = await Employee.find()
+    if (!req.user || !req.user.tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    console.log("[getEmployees] User:", req.user.userId);
+    console.log("[getEmployees] TenantId:", req.user.tenantId);
+
+    const employees = await Employee.find({ tenantId: req.user.tenantId })
       .populate("user", "status roles")
       .populate("reportingManager", "firstName lastName");
+
+    console.log(
+      "[getEmployees] Found",
+      employees.length,
+      "employees for tenant",
+      req.user.tenantId
+    );
+
     res.json(employees);
   } catch (err) {
     console.error(err);
@@ -134,7 +159,14 @@ exports.getEmployees = async (req, res) => {
 // Get single employee
 exports.getEmployeeById = async (req, res) => {
   try {
-    const employee = await Employee.findById(req.params.id)
+    if (!req.user || !req.user.tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const employee = await Employee.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+    })
       .populate("user")
       .populate("reportingManager", "firstName lastName");
     if (!employee) {

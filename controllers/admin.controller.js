@@ -71,7 +71,14 @@ exports.updateUserStatus = async (req, res) => {
 // Get all roles
 exports.getRoles = async (req, res) => {
   try {
-    const roles = await Role.find().populate("permissions");
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const roles = await Role.find({ tenantId }).select(
+      "name description permissions"
+    );
     res.json(roles);
   } catch (err) {
     console.error(err);

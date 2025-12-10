@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const employeeController = require("../controllers/employee.controller");
+const authMiddleware = require("../middleware/auth.middleware");
+const { extractTenant } = require("../middleware/tenant.middleware");
 const multer = require("multer");
 const path = require("path");
 
@@ -21,7 +23,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// router.use(authenticateToken); // Uncomment when ready
+// Apply authentication and tenant middleware
+router.use(authMiddleware.authenticateToken);
+router.use(extractTenant);
 
 router.post(
   "/",

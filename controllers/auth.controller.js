@@ -82,6 +82,19 @@ exports.login = async (req, res) => {
       });
     }
 
+    // Check if tenant is active (skip for Super Admin)
+    if (user.tenantId && !user.isSuperAdmin) {
+      const Tenant = require("../models/Tenant");
+      const tenant = await Tenant.findById(user.tenantId);
+
+      if (tenant && tenant.status === "suspended") {
+        return res.status(403).json({
+          message:
+            "Your company account has been suspended. Please contact support.",
+        });
+      }
+    }
+
     // Flatten permissions
     const permissions = new Set();
     user.roles.forEach((role) => {
@@ -96,6 +109,9 @@ exports.login = async (req, res) => {
       userId: user._id,
       permissions: permissionsArray,
       roles: user.roles.map((role) => role.name),
+      tenantId: user.tenantId, // null for Super Admin
+      isSuperAdmin: user.isSuperAdmin || false,
+      isCompanyAdmin: user.isCompanyAdmin || false,
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
@@ -194,7 +210,7 @@ exports.getMe = async (req, res) => {
 
     res.json({
       user: {
-        _id: user._id,
+        id: user._id,
         name: user.name,
         email: user.email,
         employeeId: user.employeeId,
@@ -203,15 +219,13 @@ exports.getMe = async (req, res) => {
         roles: user.roles.map((r) => r.name),
         avatar:
           employee && employee.profilePicture
-            ? `http://localhost:5001/${employee.profilePicture}`
-            : user.name
-            ? user.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .substring(0, 2)
-                .toUpperCase()
-            : "??",
+            ? `${process.env.BASE_URL || "http://localhost:5001"}/${
+                employee.profilePicture
+              }`
+            : null,
+        tenantId: user.tenantId,
+        isSuperAdmin: user.isSuperAdmin || false,
+        isCompanyAdmin: user.isCompanyAdmin || false,
       },
       permissions: Array.from(permissions),
     });

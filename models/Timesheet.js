@@ -7,6 +7,11 @@ const timesheetSchema = new mongoose.Schema(
       ref: "Employee",
       required: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
     date: {
       type: Date,
       required: true,

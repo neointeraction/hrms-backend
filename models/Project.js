@@ -7,6 +7,11 @@ const projectSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
     description: String,
     client: String,
     manager: {

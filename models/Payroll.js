@@ -12,6 +12,11 @@ const payrollSchema = new mongoose.Schema(
       ref: "Employee",
       required: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
     month: { type: String, required: true }, // e.g., "June" or "06"
     year: { type: Number, required: true }, // e.g., 2024
 

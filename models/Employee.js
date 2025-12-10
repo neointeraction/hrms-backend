@@ -9,13 +9,18 @@ const employeeSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
 
     // Basic Information
-    employeeId: { type: String, required: true, unique: true },
+    employeeId: { type: String, required: true },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     nickName: { type: String },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true },
     profilePicture: { type: String },
 
     // Work Information
@@ -112,6 +117,10 @@ const employeeSchema = new mongoose.Schema(
     timestamps: { createdAt: "addedTime", updatedAt: "modifiedTime" },
   }
 );
+
+// Compound indexes for Multi-Tenancy
+employeeSchema.index({ tenantId: 1, employeeId: 1 }, { unique: true });
+employeeSchema.index({ tenantId: 1, email: 1 }, { unique: true });
 
 module.exports =
   mongoose.models.Employee || mongoose.model("Employee", employeeSchema);

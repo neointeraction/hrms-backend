@@ -17,6 +17,7 @@ const userSchema = new mongoose.Schema({
   employeeId: {
     type: String,
     unique: true,
+    sparse: true, // Allows multiple null values, but enforces uniqueness for non-null
   },
   department: {
     type: String,
@@ -47,6 +48,22 @@ const userSchema = new mongoose.Schema({
       ref: "Role",
     },
   ],
+
+  // SaaS Multi-Tenancy Fields
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Tenant",
+    // Required for non-Super Admin users
+  },
+  isSuperAdmin: {
+    type: Boolean,
+    default: false,
+  },
+  isCompanyAdmin: {
+    type: Boolean,
+    default: false,
+  },
+
   loginHistory: [
     {
       timestamp: { type: Date, default: Date.now },

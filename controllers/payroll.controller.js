@@ -7,9 +7,17 @@ const Leave = require("../models/Leave");
 exports.calculatePayroll = async (req, res) => {
   try {
     const { employeeId, month, year } = req.body;
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
 
     // 1. Fetch Salary Structure
-    const structure = await SalaryStructure.findOne({ employee: employeeId });
+    const structure = await SalaryStructure.findOne({
+      employee: employeeId,
+      tenantId,
+    });
     if (!structure) {
       return res
         .status(400)
@@ -82,6 +90,7 @@ exports.calculatePayroll = async (req, res) => {
     } else {
       payroll = new Payroll({
         employee: employeeId,
+        tenantId,
         month,
         year,
         totalDays,

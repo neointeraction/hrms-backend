@@ -1,10 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const adminController = require("../controllers/admin.controller");
-// const { authenticateToken, authorizeRole } = require("../middleware/auth.middleware");
+const { authenticateToken } = require("../middleware/auth.middleware");
+const { extractTenant } = require("../middleware/tenant.middleware");
 
-// TODO: Add authentication middleware once fully implemented
-// router.get("/users", authenticateToken, authorizeRole('admin'), adminController.getUsers);
+// Apply authentication and tenant middleware to all routes
+router.use(authenticateToken);
+router.use(extractTenant);
 
 // For now, public or just simple route to unblock 404
 router.get("/users", adminController.getUsers);

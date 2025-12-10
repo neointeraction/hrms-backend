@@ -3,6 +3,11 @@ const mongoose = require("mongoose");
 const LeavePolicySchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
     type: {
       type: String,
       enum: [

@@ -4,26 +4,14 @@ const User = require("../models/User");
 // Create Project
 exports.createProject = async (req, res) => {
   try {
-    const {
-      name,
-      description,
-      client,
-      manager,
-      members,
-      startDate,
-      endDate,
-      budget,
-    } = req.body;
+    const tenantId = req.user.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
 
     const project = new Project({
-      name,
-      description,
-      client,
-      manager,
-      members,
-      startDate,
-      endDate,
-      budget,
+      ...req.body, // This includes name, description, client, manager, members, startDate, endDate, budget
+      tenantId,
       createdBy: req.user.userId,
     });
 
@@ -38,8 +26,13 @@ exports.createProject = async (req, res) => {
 // Get All Projects (with filters)
 exports.getProjects = async (req, res) => {
   try {
+    const tenantId = req.user.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
     const { status } = req.query;
-    let query = {};
+    let query = { tenantId }; // Scope to tenantId
 
     // Role-based filtering
     // If Admin/Accountant: see all
@@ -62,8 +55,8 @@ exports.getProjects = async (req, res) => {
     if (status) query.status = status;
 
     const projects = await Project.find(query)
-      .populate("manager", "name email")
-      .populate("members", "name email")
+      .populate("manager", "firstName lastName") // Changed to firstName lastName
+      .populate("members", "firstName lastName") // Changed to firstName lastName
       .sort({ createdAt: -1 });
 
     res.json({ projects });

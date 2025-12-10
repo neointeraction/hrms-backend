@@ -88,6 +88,9 @@ app.use("/api/holidays", require("./routes/holiday.routes"));
 app.use("/api/leave-policies", require("./routes/leavePolicy.routes"));
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/superadmin", require("./routes/superadmin.routes"));
+app.use("/api/registration", require("./routes/registration.routes"));
+app.use("/api/settings", require("./routes/settings.routes"));
 
 app.get("/", (req, res) => {
   res.send("HRM RBAC API is running");

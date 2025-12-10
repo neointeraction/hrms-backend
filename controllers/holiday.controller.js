@@ -56,6 +56,11 @@ exports.updateHoliday = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    const tenantId = req.user.tenantId; // Get tenantId from req.user
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
 
     if (updates.date) {
       const holidayDate = new Date(updates.date);

@@ -6,6 +6,11 @@ const PolicyDocumentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
     originalName: {
       type: String,
       required: true,

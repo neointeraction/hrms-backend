@@ -16,14 +16,23 @@ const calculateTotalDays = (startDate, endDate) => {
 // Helper: Check role
 const hasRole = (userRoles, role) => userRoles && userRoles.includes(role);
 
-const notifyHR = async ({ title, message, relatedId, type = "LEAVE" }) => {
+const notifyHR = async ({
+  title,
+  message,
+  relatedId,
+  type = "LEAVE",
+  tenantId,
+}) => {
   try {
-    // 1. Find Role IDs for HR and Admin
-    const hrRoles = await Role.find({ name: { $in: ["HR", "Admin"] } });
+    // 1. Find Role IDs for HR and Admin in this tenant
+    const hrRoles = await Role.find({
+      name: { $in: ["HR", "Admin"] },
+      tenantId,
+    });
     const hrRoleIds = hrRoles.map((r) => r._id);
 
-    // 2. Find Users with these roles
-    const hrUsers = await User.find({ roles: { $in: hrRoleIds } });
+    // 2. Find Users with these roles in this tenant
+    const hrUsers = await User.find({ roles: { $in: hrRoleIds }, tenantId });
 
     // 3. Send Notification to each
     for (const user of hrUsers) {
@@ -46,9 +55,17 @@ exports.applyLeave = async (req, res) => {
     const { type, startDate, endDate, reason } = req.body;
     const userId = req.user.userId;
     const userRoles = req.user.roles || [];
+    const tenantId = req.user.tenantId;
 
-    // Find employee associated with user
-    const employee = await Employee.findOne({ user: userId }).populate({
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    // Find employee associated with user in this tenant
+    const employee = await Employee.findOne({
+      user: userId,
+      tenantId,
+    }).populate({
       path: "reportingManager",
       populate: { path: "user" },
     });
@@ -74,11 +91,9 @@ exports.applyLeave = async (req, res) => {
     });
 
     if (overlappingLeave) {
-      return res
-        .status(400)
-        .json({
-          message: "You have already applied for leave during this period",
-        });
+      return res.status(400).json({
+        message: "You have already applied for leave during this period",
+      });
     }
 
     let totalDays;
@@ -115,9 +130,10 @@ exports.applyLeave = async (req, res) => {
 
     const newLeave = new Leave({
       employee: employee._id,
+      tenantId,
       type,
-      startDate,
-      endDate,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
       reason,
       totalDays,
       isHalfDay,
@@ -143,6 +159,7 @@ exports.applyLeave = async (req, res) => {
         title: "New Leave Request",
         message: `${employee.firstName} ${employee.lastName} has applied for ${type} leave.`,
         relatedId: newLeave._id,
+        tenantId,
       });
     }
 

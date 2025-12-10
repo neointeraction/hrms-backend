@@ -20,6 +20,11 @@ const salaryStructureSchema = new mongoose.Schema(
       required: true,
       unique: true, // One active structure per employee usually
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
     baseSalary: { type: Number, required: true }, // Basic Pay
     hra: { type: Number, default: 0 },
     allowances: [allowanceSchema],

@@ -7,6 +7,11 @@ const holidaySchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
     date: {
       type: Date,
       required: true,

@@ -12,6 +12,11 @@ const taskSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
     description: String,
     assignee: {
       type: mongoose.Schema.Types.ObjectId,

@@ -357,6 +357,15 @@ exports.approveTimesheet = async (req, res) => {
 // Reject Timesheet
 exports.rejectTimesheet = async (req, res) => {
   try {
+    const tenantId = req.user.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const employee = await Employee.findOne({
+      user: req.user.userId,
+      tenantId,
+    });
     const { id } = req.params;
     const { userId } = req.user;
     const { comments } = req.body;
