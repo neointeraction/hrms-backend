@@ -9,14 +9,44 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors()); // Enable CORS for all routes
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://hrms-tool.netlify.app",
+      "https://hrms-backend-azure.vercel.app",
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use(express.json());
 
 // Database Connection
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => console.log("Connected to MongoDB"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+let isConnected = false;
+const connectToDatabase = async () => {
+  if (isConnected) {
+    console.log("Using existing database connection");
+    return;
+  }
+
+  try {
+    const db = await mongoose.connect(process.env.MONGODB_URI, {
+      // useNewUrlParser: true, // Deprecated in newer mongoose but harmless
+      // useUnifiedTopology: true,
+    });
+    isConnected = db.connections[0].readyState;
+    console.log("Connected to MongoDB");
+  } catch (err) {
+    console.error("MongoDB connection error:", err);
+    // Don't exit process in serverless, just throw or let it fail
+    throw err;
+  }
+};
+
+// Connect immediately for local/serverless init
+connectToDatabase();
 
 // Serve Uploads
 app.use("/uploads", express.static("uploads"));
