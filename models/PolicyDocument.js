@@ -27,4 +27,6 @@ const PolicyDocumentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("PolicyDocument", PolicyDocumentSchema);
+module.exports =
+  mongoose.models.PolicyDocument ||
+  mongoose.model("PolicyDocument", PolicyDocumentSchema);
