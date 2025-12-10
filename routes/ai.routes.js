@@ -9,17 +9,20 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// Configure Multer
-const uploadDir = "uploads/policies";
-if (!fs.existsSync(uploadDir)) {
+// Configure Multer for PDF uploads
+const isServerless =
+  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION;
+const uploadDir = isServerless ? "/tmp" : "uploads/policies";
+
+if (!isServerless && !fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination: (req, file, cb) => {
     cb(null, uploadDir);
   },
-  filename: function (req, file, cb) {
+  filename: (req, file, cb) => {
     cb(null, Date.now() + "-" + file.originalname);
   },
 });
