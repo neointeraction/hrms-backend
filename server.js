@@ -27,7 +27,6 @@ app.use(express.json());
 let isConnected = false;
 const connectToDatabase = async () => {
   if (isConnected) {
-    console.log("Using existing database connection");
     return;
   }
 
@@ -37,16 +36,26 @@ const connectToDatabase = async () => {
       // useUnifiedTopology: true,
     });
     isConnected = db.connections[0].readyState;
-    console.log("Connected to MongoDB");
+    console.log("Connected to MongoDB via Middleware");
   } catch (err) {
     console.error("MongoDB connection error:", err);
-    // Don't exit process in serverless, just throw or let it fail
     throw err;
   }
 };
 
-// Connect immediately for local/serverless init
-connectToDatabase();
+// DB Middleware - Connect on demand
+app.use(async (req, res, next) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch (error) {
+    console.error("Database connection failed during request:", error);
+    res.status(500).json({ error: "Database connection failed" });
+  }
+});
+
+// Remove top-level connect for Vercel stability
+// connectToDatabase();
 
 // Serve Uploads
 app.use("/uploads", express.static("uploads"));
