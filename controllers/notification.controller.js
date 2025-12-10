@@ -31,16 +31,11 @@ const createNotification = async ({
 // Get notifications for logged in user
 exports.getNotifications = async (req, res) => {
   try {
-    const userId = req.user.userId; // Ensure consistent usage
-    console.log(`DEBUG: getNotifications for user: ${userId}`);
-
-    // Check if finding by _id or just id string matters with mongoose (usually works)
-    // But let's log the query result count
-    const notifications = await Notification.find({ recipient: userId })
+    const notifications = await Notification.find({
+      recipient: req.user.userId,
+    })
       .sort({ createdAt: -1 })
-      .limit(50); // Limit to last 50
-
-    console.log(`DEBUG: Found ${notifications.length} notifications`);
+      .limit(10);
     res.json(notifications);
   } catch (error) {
     console.error("DEBUG: getNotifications error:", error);
