@@ -30,6 +30,7 @@ exports.clockIn = async (req, res) => {
     // Create new time entry
     const timeEntry = new TimeEntry({
       employee: employee._id,
+      tenantId: req.user.tenantId,
       clockIn: new Date(),
       status: "active",
     });
@@ -239,7 +240,10 @@ exports.getHistory = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    const query = { employee: employee._id };
+    const query = {
+      employee: employee._id,
+      tenantId: req.user.tenantId,
+    };
 
     if (startDate || endDate) {
       query.clockIn = {};

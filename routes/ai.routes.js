@@ -46,8 +46,15 @@ router.post(
   "/upload-policy",
   auth,
   authorize(["Admin", "HR"]),
-  upload.single("policyFile"),
+  upload.array("policyFiles", 10),
   aiController.uploadPolicy
+);
+
+router.delete(
+  "/policy/:id",
+  auth,
+  authorize(["Admin", "HR"]),
+  aiController.deletePolicy
 );
 
 // Get Policy Status (Admin access mainly, but useful for UI state)

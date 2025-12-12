@@ -57,12 +57,14 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     // Check user
-    const user = await User.findOne({ email }).populate({
-      path: "roles",
-      populate: {
-        path: "permissions",
-      },
-    });
+    const user = await User.findOne({ email })
+      .populate({
+        path: "roles",
+        populate: {
+          path: "permissions",
+        },
+      })
+      .populate("tenantId", "companyName status"); // Populate tenant details
 
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
@@ -84,10 +86,7 @@ exports.login = async (req, res) => {
 
     // Check if tenant is active (skip for Super Admin)
     if (user.tenantId && !user.isSuperAdmin) {
-      const Tenant = require("../models/Tenant");
-      const tenant = await Tenant.findById(user.tenantId);
-
-      if (tenant && tenant.status === "suspended") {
+      if (user.tenantId.status === "suspended") {
         return res.status(403).json({
           message:
             "Your company account has been suspended. Please contact support.",
@@ -109,7 +108,7 @@ exports.login = async (req, res) => {
       userId: user._id,
       permissions: permissionsArray,
       roles: user.roles.map((role) => role.name),
-      tenantId: user.tenantId, // null for Super Admin
+      tenantId: user.tenantId ? user.tenantId._id : null, // Store ID only in token
       isSuperAdmin: user.isSuperAdmin || false,
       isCompanyAdmin: user.isCompanyAdmin || false,
     };
@@ -142,17 +141,12 @@ exports.login = async (req, res) => {
     await user.save();
 
     // Log Audit Entry
-    // We import logAudit from utils/auditLogger (assuming it exists or directly using model)
-    // To keep it simple and avoid circular dependencies if utils uses models, we can use AuditLog model directly or require at top
     const AuditLog = require("../models/AuditLog");
     await AuditLog.create({
       entityType: "User",
       entityId: user._id,
       action: "login",
       performedBy: user._id,
-      // Try to link to employee if possible (user.employeeId is a string, not ObjectId, need to find Employee)
-      // For now, simpler to just log user. We can populate employee if we fetch it.
-      // We can fetch employee briefly
       employee: (
         await require("../models/Employee").findOne({ user: user._id })
       )?._id,
@@ -164,9 +158,30 @@ exports.login = async (req, res) => {
           : undefined,
       },
       ipAddress: ip,
+      tenantId: user.tenantId, // Add tenantId
     });
 
-    res.json({ token });
+    // Construct response user object with populated tenant name
+    const responseUser = {
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+      roles: user.roles,
+      avatar: user.avatar,
+      employeeId: user.employeeId,
+      department: user.department,
+      doj: user.doj,
+      pan: user.pan,
+      bankName: user.bankName,
+      bankAccountNo: user.bankAccountNo,
+      tenantId: user.tenantId
+        ? { _id: user.tenantId._id, companyName: user.tenantId.companyName }
+        : null,
+      isSuperAdmin: user.isSuperAdmin,
+      isCompanyAdmin: user.isCompanyAdmin,
+    };
+
+    res.json({ token, user: responseUser });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -176,22 +191,15 @@ exports.login = async (req, res) => {
 // Get Me
 exports.getMe = async (req, res) => {
   try {
-    // req.user is set by auth middleware (to be implemented)
-    // We will fetch fresh data just in case, or return what's in token + profile
     const user = await User.findById(req.user.userId)
       .select("-passwordHash")
-      .populate("roles");
+      .populate("roles")
+      .populate("tenantId", "companyName status"); // Populate tenant details
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // We can also return the permissions from the token or re-calculate them
-    // For consistency with the requirement "Returns the authenticated user's profile and current permissions"
-    // We can re-calculate or just pass back what we have.
-    // Let's re-calculate to ensure it's up to date with DB changes if any (though token is stateless)
-    // Actually, the requirement says "current permissions", usually meaning what the user *currently* has access to.
-
-    // Let's populate deep to get permissions again
     await user.populate({
       path: "roles",
       populate: { path: "permissions" },
@@ -204,7 +212,6 @@ exports.getMe = async (req, res) => {
       });
     });
 
-    // Fetch associated Employee record to get profile picture
     const Employee = require("../models/Employee");
     const employee = await Employee.findOne({ user: user._id });
 
@@ -223,7 +230,9 @@ exports.getMe = async (req, res) => {
                 employee.profilePicture
               }`
             : null,
-        tenantId: user.tenantId,
+        tenantId: user.tenantId
+          ? { _id: user.tenantId._id, companyName: user.tenantId.companyName }
+          : null,
         isSuperAdmin: user.isSuperAdmin || false,
         isCompanyAdmin: user.isCompanyAdmin || false,
       },
@@ -232,5 +241,39 @@ exports.getMe = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Update Profile (Password, etc.)
+exports.updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { currentPassword, newPassword } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Verify current password
+    if (currentPassword) {
+      const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isMatch) {
+        return res.status(400).json({ message: "Incorrect current password" });
+      }
+    }
+
+    // Update password if provided
+    if (newPassword) {
+      const salt = await bcrypt.genSalt(10);
+      user.passwordHash = await bcrypt.hash(newPassword, salt);
+    }
+
+    await user.save();
+
+    res.json({ message: "Profile updated successfully" });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };

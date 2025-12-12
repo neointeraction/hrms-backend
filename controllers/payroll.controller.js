@@ -168,6 +168,7 @@ exports.updatePayrollStatus = async (req, res) => {
         title: "Payslip Generated",
         message: `Your payslip for ${payroll.month} ${payroll.year} has been generated and marked as Paid.`,
         relatedId: payroll._id,
+        tenantId: req.user.tenantId, // Add tenantId
       });
     }
 

@@ -4,7 +4,13 @@ const Holiday = require("../models/Holiday");
 exports.getHolidays = async (req, res) => {
   try {
     const { year } = req.query;
-    const query = {};
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const query = { tenantId };
     if (year) {
       query.year = year;
     }
@@ -29,6 +35,7 @@ exports.addHoliday = async (req, res) => {
     const year = holidayDate.getFullYear();
 
     const holiday = new Holiday({
+      tenantId: req.user.tenantId, // Add tenantId
       name,
       date: holidayDate,
       day,
@@ -120,13 +127,19 @@ exports.seedHolidays = async (req, res) => {
       { name: "Christmas", date: "2025-12-25", type: "Public" },
     ];
 
-    // Clear existing for 2025 to avoid duplicates during re-seed
-    await Holiday.deleteMany({ year: 2025 });
+    const tenantId = req.user.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    // Clear existing for 2025 for this tenant to avoid duplicates during re-seed
+    await Holiday.deleteMany({ year: 2025, tenantId });
 
     const processed = holidays2025.map((h) => {
       const d = new Date(h.date);
       return {
         ...h,
+        tenantId, // Add tenantId
         day: d.toLocaleDateString("en-US", { weekday: "long" }),
         year: 2025,
       };

@@ -24,6 +24,14 @@ router.get("/active", leaveController.getEmployeesOnLeave);
 // Get Leave Stats
 router.get("/stats", leaveController.getLeaveStats);
 
+// HR Overview (Place before :id routes to avoid conflict if any)
+const { authorize } = require("../middleware/auth.middleware");
+router.get(
+  "/hr-overview",
+  authorize(["HR", "Admin"]),
+  leaveController.getHRLeaveOverview
+);
+
 // Reject Leave
 router.put("/:id/reject", leaveController.rejectLeave);
 

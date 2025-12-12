@@ -55,8 +55,9 @@ exports.authorize = (allowedRoles = []) => {
 
     // Check if user has roles array and if any of user's roles match allowed roles
     const userRoles = req.user.roles || [];
+    const normalizedAllowed = allowedRoles.map((r) => r.toLowerCase());
     const hasMatchingRole = userRoles.some((userRole) =>
-      allowedRoles.includes(userRole)
+      normalizedAllowed.includes(userRole.toLowerCase())
     );
 
     console.log("  - user roles:", userRoles);

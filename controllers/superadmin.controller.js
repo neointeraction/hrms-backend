@@ -1,6 +1,7 @@
 const Tenant = require("../models/Tenant");
 const User = require("../models/User");
 const Role = require("../models/Role");
+const Employee = require("../models/Employee"); // Import Employee for cascading delete
 const bcrypt = require("bcryptjs");
 
 // Get All Tenants
@@ -26,11 +27,14 @@ exports.getAllTenants = async (req, res) => {
     const tenantsWithStats = await Promise.all(
       tenants.map(async (tenant) => {
         const userCount = await User.countDocuments({ tenantId: tenant._id });
+        const employeeCount = await Employee.countDocuments({
+          tenantId: tenant._id,
+        });
         return {
           ...tenant.toObject(),
           stats: {
             userCount,
-            employeeCount: tenant.usage.employeeCount,
+            employeeCount, // Dynamic count
             storageUsed: tenant.usage.storageUsed,
           },
         };
@@ -40,6 +44,43 @@ exports.getAllTenants = async (req, res) => {
     res.json({ tenants: tenantsWithStats });
   } catch (error) {
     console.error("Get tenants error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Get All Users (Global)
+exports.getAllUsers = async (req, res) => {
+  try {
+    const { search, role, tenantId, status } = req.query;
+    const query = {};
+
+    if (status) query.status = status;
+    if (tenantId) query.tenantId = tenantId;
+
+    // Search by name or email
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // If role filter is applied, we need to find role IDs first
+    if (role) {
+      const roles = await Role.find({ name: role }).select("_id");
+      const roleIds = roles.map((r) => r._id);
+      query.roles = { $in: roleIds };
+    }
+
+    const users = await User.find(query)
+      .select("-passwordHash")
+      .populate("roles", "name")
+      .populate("tenantId", "companyName plan status") // Get tenant details
+      .sort({ createdAt: -1 });
+
+    res.json(users);
+  } catch (error) {
+    console.error("Get all global users error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -56,6 +97,9 @@ exports.getTenantById = async (req, res) => {
 
     // Get tenant statistics
     const userCount = await User.countDocuments({ tenantId: tenant._id });
+    const employeeCount = await Employee.countDocuments({
+      tenantId: tenant._id,
+    });
     const adminUser = await User.findOne({
       tenantId: tenant._id,
       isCompanyAdmin: true,
@@ -65,7 +109,7 @@ exports.getTenantById = async (req, res) => {
       tenant,
       stats: {
         userCount,
-        employeeCount: tenant.usage.employeeCount,
+        employeeCount, // Dynamic count
         storageUsed: tenant.usage.storageUsed,
       },
       admin: adminUser,
@@ -158,7 +202,7 @@ exports.createTenant = async (req, res) => {
     const tenant = new Tenant({
       companyName,
       ownerEmail,
-      subdomain,
+      subdomain: subdomain || undefined, // Avoid empty string for unique index
       plan: selectedPlan,
       status: "active",
       limits,
@@ -234,6 +278,60 @@ exports.updateTenant = async (req, res) => {
     delete updates.createdBy;
     delete updates.createdAt;
     delete updates.usage; // Usage should be updated via specific endpoints
+
+    // If plan is being updated, update limits as well
+    if (updates.plan) {
+      const planLimits = {
+        free: {
+          maxEmployees: 10,
+          maxStorage: 100, // MB
+          enabledModules: ["attendance", "leave", "employees"],
+        },
+        basic: {
+          maxEmployees: 50,
+          maxStorage: 500,
+          enabledModules: [
+            "attendance",
+            "leave",
+            "employees",
+            "payroll",
+            "projects",
+          ],
+        },
+        pro: {
+          maxEmployees: 200,
+          maxStorage: 2000,
+          enabledModules: [
+            "attendance",
+            "leave",
+            "employees",
+            "payroll",
+            "projects",
+            "tasks",
+            "timesheet",
+          ],
+        },
+        enterprise: {
+          maxEmployees: 9999,
+          maxStorage: 10000,
+          enabledModules: [
+            "attendance",
+            "leave",
+            "employees",
+            "payroll",
+            "projects",
+            "tasks",
+            "timesheet",
+            "policies",
+          ],
+        },
+      };
+
+      const newLimits = planLimits[updates.plan];
+      if (newLimits) {
+        updates.limits = newLimits;
+      }
+    }
 
     const tenant = await Tenant.findByIdAndUpdate(id, updates, { new: true });
 
@@ -423,7 +521,57 @@ exports.getTenantUsage = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Usage error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Update User Status (Global)
+exports.updateUserStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["active", "inactive", "suspended"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+
+    const user = await User.findByIdAndUpdate(id, { status }, { new: true });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User status updated", user });
+  } catch (error) {
+    console.error("Update user status error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Delete User (Global - Hard Delete)
+exports.deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Prevent deleting self
+    if (user._id.toString() === req.user.userId) {
+      return res.status(400).json({ message: "Cannot delete yourself" });
+    }
+
+    // Delete associated employee record
+    await Employee.deleteOne({ user: id });
+
+    // Delete user
+    await User.findByIdAndDelete(id);
+
+    res.json({ message: "User and associated data deleted successfully" });
+  } catch (error) {
+    console.error("Delete user error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

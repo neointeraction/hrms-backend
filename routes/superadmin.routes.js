@@ -10,6 +10,9 @@ router.use(requireSuperAdmin);
 
 // Tenant Management
 router.get("/tenants", superadminController.getAllTenants);
+router.get("/users", superadminController.getAllUsers);
+router.patch("/users/:id/status", superadminController.updateUserStatus); // New route
+router.delete("/users/:id", superadminController.deleteUser); // New route
 router.get("/tenants/:id", superadminController.getTenantById);
 router.post("/tenants", superadminController.createTenant);
 router.patch("/tenants/:id", superadminController.updateTenant);

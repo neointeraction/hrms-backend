@@ -3,7 +3,7 @@ const router = express.Router();
 const holidayController = require("../controllers/holiday.controller");
 const {
   authenticateToken: protect,
-  authorizePermission: authorize,
+  authorize,
 } = require("../middleware/auth.middleware");
 
 // Public (authenticated) - View all
@@ -13,19 +13,19 @@ router.get("/", protect, holidayController.getHolidays);
 router.post(
   "/",
   protect,
-  authorize("admin", "hr"),
+  authorize(["admin", "hr"]),
   holidayController.addHoliday
 );
 router.put(
   "/:id",
   protect,
-  authorize("admin", "hr"),
+  authorize(["admin", "hr"]),
   holidayController.updateHoliday
 );
 router.delete(
   "/:id",
   protect,
-  authorize("admin", "hr"),
+  authorize(["admin", "hr"]),
   holidayController.deleteHoliday
 );
 
@@ -33,7 +33,7 @@ router.delete(
 router.post(
   "/seed",
   protect,
-  authorize("admin"),
+  authorize(["admin"]),
   holidayController.seedHolidays
 );
 

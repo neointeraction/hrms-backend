@@ -107,6 +107,22 @@ const tenantSchema = new mongoose.Schema(
       ref: "User", // Super Admin who created this tenant
     },
     notes: String, // Internal notes for Super Admin
+
+    // AI Configuration
+    aiConfig: {
+      enabled: {
+        type: Boolean,
+        default: true,
+      },
+      welcomeMessage: {
+        type: String,
+        default: "Hello! I am your AI HR Assistant. How can I help you today?",
+      },
+      context: {
+        type: String, // Company specific context/rules
+        default: "",
+      },
+    },
   },
   {
     timestamps: true,

@@ -30,6 +30,22 @@ exports.createEmployee = async (req, res) => {
     }
     const tenantId = req.user.tenantId;
 
+    // Check Tenant Limits
+    const Tenant = require("../models/Tenant");
+    const tenant = await Tenant.findById(tenantId);
+
+    if (!tenant) {
+      throw new Error("Tenant context not found");
+    }
+
+    const currentEmployeeCount = await Employee.countDocuments({ tenantId });
+
+    if (currentEmployeeCount >= tenant.limits.maxEmployees) {
+      throw new Error(
+        `Employee limit reached for your ${tenant.plan} plan (${tenant.limits.maxEmployees} employees). Please upgrade your plan.`
+      );
+    }
+
     // 1. Check if user/employee already exists in this tenant
     const existingUser = await User.findOne({ email, tenantId });
     if (existingUser) {
@@ -71,7 +87,14 @@ exports.createEmployee = async (req, res) => {
     const cleanedData = { ...otherData };
 
     // Parse JSON fields (Handle FormData strings)
-    const jsonFields = ["workExperience", "education", "dependents", "tags"];
+    // Parse JSON fields (Handle FormData strings)
+    const jsonFields = [
+      "workExperience",
+      "education",
+      "dependents",
+      "tags",
+      "bankDetails",
+    ];
     jsonFields.forEach((field) => {
       if (typeof cleanedData[field] === "string") {
         try {
@@ -117,6 +140,15 @@ exports.createEmployee = async (req, res) => {
 
     await newEmployee.save({ session });
 
+    // Increment tenant employee count
+    await Tenant.findByIdAndUpdate(
+      tenantId,
+      {
+        $inc: { "usage.employeeCount": 1 },
+      },
+      { session }
+    );
+
     await session.commitTransaction();
     res.status(201).json(newEmployee);
   } catch (err) {
@@ -140,16 +172,35 @@ exports.getEmployees = async (req, res) => {
 
     const employees = await Employee.find({ tenantId: req.user.tenantId })
       .populate("user", "status roles")
-      .populate("reportingManager", "firstName lastName");
+      .populate("reportingManager", "firstName lastName")
+      .lean(); // Use lean() to allow adding properties
+
+    // Fetch active time entries for this tenant for today/current status
+    // status: "active" implies they are currently clocked in
+    const TimeEntry = require("../models/TimeEntry");
+    const activeEntries = await TimeEntry.find({
+      tenantId: req.user.tenantId,
+      status: "active",
+    }).select("employee");
+
+    const activeEmployeeIds = new Set(
+      activeEntries.map((entry) => entry.employee.toString())
+    );
+
+    // Add isOnline flag
+    const employeesWithStatus = employees.map((emp) => ({
+      ...emp,
+      isOnline: activeEmployeeIds.has(emp._id.toString()),
+    }));
 
     console.log(
       "[getEmployees] Found",
-      employees.length,
+      employeesWithStatus.length,
       "employees for tenant",
       req.user.tenantId
     );
 
-    res.json(employees);
+    res.json(employeesWithStatus);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -190,7 +241,14 @@ exports.updateEmployee = async (req, res) => {
     }
 
     // Parse JSON fields (Handle FormData strings)
-    const jsonFields = ["workExperience", "education", "dependents", "tags"];
+    // Parse JSON fields (Handle FormData strings)
+    const jsonFields = [
+      "workExperience",
+      "education",
+      "dependents",
+      "tags",
+      "bankDetails",
+    ];
     jsonFields.forEach((field) => {
       if (typeof cleanedData[field] === "string") {
         try {
@@ -266,8 +324,15 @@ exports.updateEmployee = async (req, res) => {
 // Get Employee Hierarchy (Simplified list for tree building)
 exports.getHierarchy = async (req, res) => {
   try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
     const employees = await Employee.find(
-      { role: { $nin: ["Admin", "Super Admin"] } },
+      {
+        tenantId: req.user.tenantId, // Filter by tenant
+        role: { $nin: ["Admin", "Super Admin"] },
+      },
       {
         firstName: 1,
         lastName: 1,
@@ -292,8 +357,16 @@ exports.getUpcomingEvents = async (req, res) => {
     const next30Days = new Date();
     next30Days.setDate(today.getDate() + 30);
 
+    // Filter by Tenant ID
+    if (!req.user || !req.user.tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
     const employees = await Employee.find(
-      { employeeStatus: "Active" }, // Only active employees
+      {
+        employeeStatus: "Active",
+        tenantId: req.user.tenantId,
+      },
       {
         firstName: 1,
         lastName: 1,

@@ -13,6 +13,11 @@ exports.getAuditLogs = async (req, res) => {
       limit: parseInt(req.query.limit) || 100,
     };
 
+    // Scope to tenant if user has tenantId
+    if (req.user && req.user.tenantId) {
+      filters.tenantId = req.user.tenantId;
+    }
+
     const logs = await getAuditLogs(filters);
 
     res.json({ logs });
@@ -27,10 +32,12 @@ exports.getEntityAuditLogs = async (req, res) => {
   try {
     const { entityType, entityId } = req.params;
 
-    const logs = await AuditLog.find({
-      entityType,
-      entityId,
-    })
+    const query = { entityType, entityId };
+    if (req.user && req.user.tenantId) {
+      query.tenantId = req.user.tenantId;
+    }
+
+    const logs = await AuditLog.find(query)
       .populate("performedBy", "name email")
       .populate("employee", "firstName lastName employeeId")
       .sort({ createdAt: -1 });

@@ -71,6 +71,7 @@ const timeCorrectionRoutes = require("./routes/timeCorrection.routes");
 const auditRoutes = require("./routes/audit.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const aiRoutes = require("./routes/ai.routes");
+const feedbackRoutes = require("./routes/feedback.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/hr", hrRoutes);
@@ -91,15 +92,25 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/superadmin", require("./routes/superadmin.routes"));
 app.use("/api/registration", require("./routes/registration.routes"));
 app.use("/api/settings", require("./routes/settings.routes"));
+app.use("/api/feedback", feedbackRoutes);
+app.use("/api/badges", require("./routes/badge.routes"));
+app.use("/api/appreciation", require("./routes/appreciation.routes"));
+app.use("/api/email-automation", require("./routes/email.routes"));
 
 app.get("/", (req, res) => {
   res.send("HRM RBAC API is running");
 });
 
+const { initCron } = require("./jobs/email.cron");
+
+// ... (existing helper function if needed, or just imports)
+
 // Start Server
 if (require.main === module) {
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`Server running on port ${PORT}`);
+    // Initialize Email Automation Cron
+    initCron();
   });
 }
 

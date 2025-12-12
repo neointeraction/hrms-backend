@@ -10,6 +10,7 @@ const AuditLog = require("../models/AuditLog");
  * @param {Object} changes - Object containing old and new values
  * @param {Object} metadata - Additional context
  * @param {String} ipAddress - IP address (optional)
+ * @param {ObjectId} tenantId - Tenant ID (optional)
  */
 async function createAuditLog({
   entityType,
@@ -20,6 +21,7 @@ async function createAuditLog({
   changes = {},
   metadata = {},
   ipAddress = null,
+  tenantId = null,
 }) {
   try {
     const auditLog = new AuditLog({
@@ -31,6 +33,7 @@ async function createAuditLog({
       changes,
       metadata,
       ipAddress,
+      tenantId,
     });
 
     await auditLog.save();
@@ -52,6 +55,7 @@ async function getAuditLogs(filters = {}) {
   if (filters.action) query.action = filters.action;
   if (filters.employee) query.employee = filters.employee;
   if (filters.performedBy) query.performedBy = filters.performedBy;
+  if (filters.tenantId) query.tenantId = filters.tenantId;
 
   if (filters.startDate || filters.endDate) {
     query.createdAt = {};

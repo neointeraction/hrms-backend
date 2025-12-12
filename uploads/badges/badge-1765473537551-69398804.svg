@@ -1,0 +1,26 @@
+  <svg width="64" height="80" viewBox="0 0 64 80" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="bg1" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                <stop offset="0%" style="stop-color:#E3F2FD;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#90CAF9;stop-opacity:1" />
+              </radialGradient>
+              <linearGradient id="stopwatchGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#4FC3F7;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#2196F3;stop-opacity:1" />
+              </linearGradient>
+            </defs>
+            <!-- Ribbon Tails -->
+            <path d="M20 30 L14 74 L26 66 L32 55 Z" fill="#1565C0"/>
+            <path d="M44 30 L50 74 L38 66 L32 55 Z" fill="#0D47A1"/>
+            <!-- Main Badge Body -->
+            <circle cx="32" cy="30" r="26" fill="url(#bg1)" stroke="#FFF" stroke-width="2"/>
+            <!-- Inner Icon (Scaled & Centered) -->
+            <g transform="translate(8, 6) scale(0.75)">
+              <circle cx="32" cy="34" r="15" fill="url(#stopwatchGrad)"/>
+              <rect x="29" y="13" width="6" height="5" rx="1" fill="#1976D2"/>
+              <path d="M24 16 L20 20 M40 16 L44 20" stroke="#29B6F6" stroke-width="3" stroke-linecap="round"/>
+              <path d="M32 34 L32 24" stroke="#FFF" stroke-width="2.5" stroke-linecap="round"/>
+              <path d="M32 34 L39 34" stroke="#FFF" stroke-width="2.5" stroke-linecap="round"/>
+              <circle cx="32" cy="34" r="2" fill="white"/>
+            </g>
+          </svg>

@@ -68,7 +68,12 @@ exports.getProjects = async (req, res) => {
 // Get Single Project
 exports.getProjectById = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id)
+    const tenantId = req.user.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const project = await Project.findOne({ _id: req.params.id, tenantId })
       .populate("manager", "name email")
       .populate("members", "name email");
 
@@ -83,9 +88,18 @@ exports.getProjectById = async (req, res) => {
 // Update Project
 exports.updateProject = async (req, res) => {
   try {
-    const project = await Project.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
+    const tenantId = req.user.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const project = await Project.findOneAndUpdate(
+      { _id: req.params.id, tenantId },
+      req.body,
+      {
+        new: true,
+      }
+    );
     if (!project) return res.status(404).json({ message: "Project not found" });
     res.json({ message: "Project updated", project });
   } catch (error) {

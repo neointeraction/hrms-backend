@@ -35,7 +35,7 @@ const holidaySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Prevent duplicate holidays on the same date
-holidaySchema.index({ date: 1 }, { unique: true });
+// Prevent duplicate holidays on the same date within a tenant
+holidaySchema.index({ date: 1, tenantId: 1 }, { unique: true });
 
 module.exports = mongoose.model("Holiday", holidaySchema);

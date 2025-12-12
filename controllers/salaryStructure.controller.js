@@ -27,7 +27,13 @@ exports.upsertSalaryStructure = async (req, res) => {
     const netSalary =
       Number(baseSalary) + Number(hra) + totalAllowances - totalDeductions;
 
-    let structure = await SalaryStructure.findOne({ employee: employeeId });
+    // Use tenantId to ensure we are looking at the right tenant's data
+    const tenantId = req.user.tenantId;
+
+    let structure = await SalaryStructure.findOne({
+      employee: employeeId,
+      tenantId, // Scope to tenant
+    });
 
     if (structure) {
       // Update
@@ -40,6 +46,7 @@ exports.upsertSalaryStructure = async (req, res) => {
     } else {
       // Create
       structure = new SalaryStructure({
+        tenantId, // Add tenantId
         employee: employeeId,
         baseSalary,
         hra,
@@ -68,6 +75,7 @@ exports.getSalaryStructure = async (req, res) => {
 
     const structure = await SalaryStructure.findOne({
       employee: employeeId,
+      tenantId: req.user.tenantId, // Scope to tenant
     }).populate("employee", "firstName lastName employeeId designation");
 
     if (!structure) {

@@ -2,7 +2,9 @@ const Leave = require("../models/Leave");
 const Employee = require("../models/Employee");
 const User = require("../models/User");
 const Role = require("../models/Role");
+const LeavePolicy = require("../models/LeavePolicy");
 const { createNotification } = require("./notification.controller");
+const mongoose = require("mongoose");
 
 // Calculate total days between two dates
 const calculateTotalDays = (startDate, endDate) => {
@@ -42,6 +44,7 @@ const notifyHR = async ({
         title,
         message,
         relatedId,
+        tenantId, // Add tenantId
       });
     }
   } catch (error) {
@@ -150,6 +153,7 @@ exports.applyLeave = async (req, res) => {
         title: "New Leave Request (Needs HR)",
         message: `${employee.firstName} ${employee.lastName} has applied for leave requiring HR approval.`,
         relatedId: newLeave._id,
+        tenantId, // Add tenantId
       });
     } else if (employee.reportingManager && employee.reportingManager.user) {
       // Notify Manager
@@ -176,7 +180,13 @@ exports.applyLeave = async (req, res) => {
 exports.getMyLeaves = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const employee = await Employee.findOne({ user: userId });
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const employee = await Employee.findOne({ user: userId, tenantId });
 
     if (!employee) {
       return res.status(404).json({ message: "Employee profile not found" });
@@ -196,7 +206,13 @@ exports.getMyLeaves = async (req, res) => {
 exports.getPendingApprovals = async (req, res) => {
   try {
     const userRoles = req.user.roles || [];
-    let query = { status: "Pending" };
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    let query = { status: "Pending", tenantId };
     let authorized = false;
 
     // HR and Admin allow viewing ALL pending requests
@@ -236,10 +252,15 @@ exports.approveLeave = async (req, res) => {
     const { comments } = req.body;
     const userRoles = req.user.roles || [];
     const approverId = req.user.userId;
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
 
     console.log(`DEBUG: approveLeave id=${id} roles=${userRoles}`);
 
-    const leave = await Leave.findById(id).populate({
+    const leave = await Leave.findOne({ _id: id, tenantId }).populate({
       path: "employee",
       populate: { path: "user" },
     });
@@ -317,6 +338,7 @@ exports.approveLeave = async (req, res) => {
         title: "Leave Request Forwarded",
         message: `A leave request for ${leave.employee.firstName} ${leave.employee.lastName} has been approved by PM and requires HR approval.`,
         relatedId: leave._id,
+        tenantId, // Add tenantId
       });
       // Also notify Employee? "Your leave is progressing" - Optional, maybe too noisy.
       // Let's stick to notifying employee only on Final decision for now, OR if specific update requested.
@@ -333,6 +355,7 @@ exports.approveLeave = async (req, res) => {
           nextStatus === "Approved" ? "Approved" : "Pending HR"
         }.`,
         relatedId: leave._id,
+        tenantId, // Add tenantId
       });
     }
 
@@ -347,9 +370,14 @@ exports.updateLeaveStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, remarks } = req.body;
+    const tenantId = req.user.tenantId;
 
-    const leave = await Leave.findByIdAndUpdate(
-      id,
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const leave = await Leave.findOneAndUpdate(
+      { _id: id, tenantId },
       { status, remarks },
       { new: true }
     ).populate("employee");
@@ -360,7 +388,7 @@ exports.updateLeaveStatus = async (req, res) => {
 
     // Trigger Notification
     await createNotification({
-      recipient: leave.employee._id,
+      recipient: leave.employee.user, // User ID directly from employee doc
       type: "LEAVE",
       title: "Leave Request Updated",
       message: `Your leave request from ${new Date(
@@ -369,6 +397,7 @@ exports.updateLeaveStatus = async (req, res) => {
         leave.endDate
       ).toLocaleDateString()} has been ${status}.`,
       relatedId: leave._id,
+      tenantId, // Add tenantId
     });
 
     res.json(leave);
@@ -384,8 +413,15 @@ exports.rejectLeave = async (req, res) => {
     const { comments } = req.body;
     const approverId = req.user.userId;
     const userRoles = req.user.roles || [];
+    const tenantId = req.user.tenantId;
 
-    const leave = await Leave.findById(id).populate("employee");
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const leave = await Leave.findOne({ _id: id, tenantId }).populate(
+      "employee"
+    );
     if (!leave) {
       return res.status(404).json({ message: "Leave request not found" });
     }
@@ -436,6 +472,7 @@ exports.rejectLeave = async (req, res) => {
         title: "Leave Request Rejected",
         message: `Your leave request has been rejected.`,
         relatedId: leave._id,
+        tenantId, // Add tenantId
       });
     }
 
@@ -449,46 +486,73 @@ exports.rejectLeave = async (req, res) => {
 exports.getLeaveStats = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const employee = await Employee.findOne({ user: userId });
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const employee = await Employee.findOne({ user: userId, tenantId });
 
     if (!employee) {
       return res.status(404).json({ message: "Employee profile not found" });
     }
 
     // Determine Leave Types and Limits based on Role/Type
-    let leavePolicy = {
-      Casual: 12, // Default
-      Sick: 6,
-      Floating: 5,
-    };
+    // Determine Leave Types and Limits based on Tenant Policy
+    let leavePolicy = {};
 
-    const isIntern =
-      employee.employmentType === "Intern" ||
-      employee.employeeStatus === "Probation";
-    const isConsultant = employee.employmentType === "Contract"; // Assuming Consultant = Contract
+    const policies = await LeavePolicy.find({
+      tenantId,
+      status: "Active",
+    });
 
-    if (isIntern) {
-      // Calculate months of service for accumulated leaves
-      const joiningDate = new Date(employee.dateOfJoining || new Date());
-      const now = new Date();
-      const monthsService =
-        (now.getFullYear() - joiningDate.getFullYear()) * 12 +
-        (now.getMonth() - joiningDate.getMonth()) +
-        1; // Including current month
+    if (policies.length > 0) {
+      policies.forEach((policy) => {
+        // Check eligibility
+        const eligibility = policy.eligibility || {};
 
-      const accruedLeaves = Math.min(monthsService, 12); // 1 per month, max 12
+        // 1. Employee Type check
+        if (
+          eligibility.employeeTypes &&
+          eligibility.employeeTypes.length > 0 &&
+          !eligibility.employeeTypes.includes("All") &&
+          !eligibility.employeeTypes.includes(employee.employmentType)
+        ) {
+          return; // Skip if type doesn't match
+        }
 
-      leavePolicy = {
-        Casual: accruedLeaves, // "One leave per month" mapped to Casual for simplicity/tracking
-        Sick: 0,
-        Floating: 0,
-      };
-    } else if (isConsultant) {
+        // 2. Gender check
+        if (
+          eligibility.gender &&
+          eligibility.gender !== "All" &&
+          eligibility.gender !== employee.gender
+        ) {
+          return;
+        }
+
+        // Add to policy map (Use policy Name or Type)
+        // Using Type to group standard leaves, but name might be more descriptive
+        // For stats consistency, let's use Type if standard, or Name if Custom
+        const key =
+          policy.type === "Custom" ? policy.name : policy.type || policy.name;
+        leavePolicy[key] = policy.allocation.count;
+      });
+    } else {
+      // Fallback defaults if no policy configured yet
       leavePolicy = {
         Casual: 12,
         Sick: 6,
         Floating: 0,
       };
+
+      // Simple hardcoded fallbacks based on type still useful for scaffolding
+      if (
+        employee.employmentType === "Intern" ||
+        employee.employeeStatus === "Probation"
+      ) {
+        leavePolicy = { Casual: 1, Sick: 0 };
+      }
     }
 
     // Get Approved and Pending Leaves count for current year
@@ -555,7 +619,12 @@ exports.getEmployeesOnLeave = async (req, res) => {
     const endOfDay = new Date(today);
     endOfDay.setHours(23, 59, 59, 999);
 
+    if (!req.user || !req.user.tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
     const leaves = await Leave.find({
+      tenantId: req.user.tenantId, // Filter by tenant
       status: "Approved",
       startDate: { $lte: endOfDay },
       endDate: { $gte: startOfDay },
@@ -566,7 +635,137 @@ exports.getEmployeesOnLeave = async (req, res) => {
 
     res.json(leaves);
   } catch (error) {
-    console.error("Get employees on leave error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// HR Overview: Get All Leaves with Filters and Aggregation
+exports.getHRLeaveOverview = async (req, res) => {
+  try {
+    const { month, year, department, employee, type, status } = req.query;
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    // Date Range Calculation
+    const effectiveYear = parseInt(year) || new Date().getFullYear();
+    const effectiveMonth = parseInt(month)
+      ? parseInt(month) - 1
+      : new Date().getMonth(); // 0-indexed
+
+    const startOfMonth = new Date(effectiveYear, effectiveMonth, 1);
+    const endOfMonth = new Date(
+      effectiveYear,
+      effectiveMonth + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
+
+    // Build Query
+    let query = {
+      tenantId: new mongoose.Types.ObjectId(tenantId),
+      startDate: { $gte: startOfMonth, $lte: endOfMonth },
+    };
+
+    if (type && type !== "All") query.type = type;
+    if (status && status !== "All") query.status = status;
+
+    // Fetch Leaves with populate
+    // We will use aggregation to join employee first to support filtering
+    const pipeline = [
+      { $match: query },
+      {
+        $lookup: {
+          from: "employees",
+          localField: "employee",
+          foreignField: "_id",
+          as: "employeeDetails",
+        },
+      },
+      { $unwind: "$employeeDetails" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "employeeDetails.user",
+          foreignField: "_id",
+          as: "userDetails",
+        },
+      },
+      { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
+    ];
+
+    // Apply Employee Filters
+    const matchEmployee = {};
+    if (department && department !== "All")
+      matchEmployee["employeeDetails.department"] = department;
+
+    if (employee && employee !== "All") {
+      // Assuming frontend sends User ID (common pattern) or Employee ID.
+      // Let's try matching User ID since 'getEmployees' returns that structure usually.
+      // If we want to be robust, we can try to match either.
+      // But typically filtering is by User ID in this app context.
+      matchEmployee["employeeDetails.user"] = new mongoose.Types.ObjectId(
+        employee
+      );
+    }
+
+    if (Object.keys(matchEmployee).length > 0) {
+      pipeline.push({ $match: matchEmployee });
+    }
+
+    // Sort
+    pipeline.push({ $sort: { startDate: -1 } });
+
+    const leaves = await Leave.aggregate(pipeline);
+
+    // Calculate Total Leaves Taken per Employee for this Month
+    // We can do a separate aggregation for totals
+    const totalLeavesPipeline = [
+      {
+        $match: {
+          tenantId: new mongoose.Types.ObjectId(tenantId),
+          status: "Approved", // Only count approved? Req says "Total Leaves Taken", implies approved.
+          startDate: { $gte: startOfMonth, $lte: endOfMonth },
+        },
+      },
+      {
+        $group: {
+          _id: "$employee",
+          totalMonthLeaves: { $sum: "$totalDays" },
+        },
+      },
+    ];
+
+    const totals = await Leave.aggregate(totalLeavesPipeline);
+
+    // Map totals for O(1) lookup
+    const totalsMap = {};
+    totals.forEach((t) => {
+      totalsMap[t._id.toString()] = t.totalMonthLeaves;
+    });
+
+    // Merge Results
+    const validLeaves = leaves.map((leave) => ({
+      ...leave,
+
+      // Flatten structure for easier frontend consumption
+      employeeName:
+        leave.employeeDetails.firstName + " " + leave.employeeDetails.lastName,
+      employeeId: leave.employeeDetails.employeeId,
+      department: leave.employeeDetails.department,
+      designation: leave.employeeDetails.designation,
+
+      totalLeavesTakenMonth: totalsMap[leave.employee.toString()] || 0,
+    }));
+
+    res.json(validLeaves);
+  } catch (error) {
+    console.error("HR Leave Overview Error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

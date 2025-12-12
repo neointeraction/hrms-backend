@@ -7,6 +7,11 @@ const timeCorrectionSchema = new mongoose.Schema(
       ref: "Employee",
       required: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
     timeEntry: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "TimeEntry",

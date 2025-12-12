@@ -41,6 +41,11 @@ const auditLogSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed, // Additional context
     },
     ipAddress: String,
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: false, // Optional for system-level actions
+    },
   },
   { timestamps: true }
 );
@@ -49,6 +54,7 @@ const auditLogSchema = new mongoose.Schema(
 auditLogSchema.index({ entityType: 1, entityId: 1 });
 auditLogSchema.index({ performedBy: 1 });
 auditLogSchema.index({ employee: 1 });
+auditLogSchema.index({ tenantId: 1 }); // Index for tenant filtering
 auditLogSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("AuditLog", auditLogSchema);

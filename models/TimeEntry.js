@@ -7,6 +7,11 @@ const timeEntrySchema = new mongoose.Schema(
       ref: "Employee",
       required: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+    },
     clockIn: {
       type: Date,
       required: true,

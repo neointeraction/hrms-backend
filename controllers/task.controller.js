@@ -21,7 +21,9 @@ exports.createTask = async (req, res) => {
       priority,
       dueDate,
       milestone,
+      milestone,
       createdBy: req.user.userId,
+      tenantId: req.user.tenantId, // Add tenantId
     });
 
     await task.save();
@@ -36,7 +38,13 @@ exports.createTask = async (req, res) => {
 exports.getTasks = async (req, res) => {
   try {
     const { projectId } = req.query;
-    let query = {};
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    let query = { tenantId }; // Default to tenant scope
     if (projectId) query.project = projectId;
 
     const tasks = await Task.find(query)

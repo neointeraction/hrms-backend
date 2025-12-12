@@ -108,6 +108,13 @@ const employeeSchema = new mongoose.Schema(
         dob: Date,
       },
     ],
+    // Bank Details
+    bankDetails: {
+      accountName: { type: String },
+      accountNumber: { type: String },
+      bankName: { type: String },
+      ifscCode: { type: String },
+    },
 
     // System Metadata
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

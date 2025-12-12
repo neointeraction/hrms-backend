@@ -16,8 +16,8 @@ const userSchema = new mongoose.Schema({
   },
   employeeId: {
     type: String,
-    unique: true,
-    sparse: true, // Allows multiple null values, but enforces uniqueness for non-null
+    // unique: true, // REMOVED global uniqueness
+    sparse: true, // Allows multiple null values
   },
   department: {
     type: String,
@@ -77,5 +77,11 @@ const userSchema = new mongoose.Schema({
     },
   ],
 });
+
+// Compound indexes to allow same employeeId in different tenants
+userSchema.index(
+  { employeeId: 1, tenantId: 1 },
+  { unique: true, sparse: true }
+);
 
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);

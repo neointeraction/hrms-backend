@@ -29,6 +29,7 @@ exports.requestCorrection = async (req, res) => {
       requestedClockOut,
       reason,
       timeEntry: timeEntryId || null,
+      tenantId: req.user.tenantId, // Add tenantId
     });
 
     await correction.save();
@@ -47,8 +48,11 @@ exports.requestCorrection = async (req, res) => {
 exports.getPendingCorrections = async (req, res) => {
   try {
     // Get all pending corrections
-    // In a real app, you'd filter by reporting manager
-    const corrections = await TimeCorrection.find({ status: "pending" })
+    // Filter by reporting manager AND tenant
+    const corrections = await TimeCorrection.find({
+      status: "pending",
+      tenantId: req.user.tenantId,
+    })
       .populate("employee", "firstName lastName employeeId")
       .populate("timeEntry")
       .sort({ createdAt: -1 });
@@ -70,7 +74,10 @@ exports.getMyCorrections = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    const corrections = await TimeCorrection.find({ employee: employee._id })
+    const corrections = await TimeCorrection.find({
+      employee: employee._id,
+      tenantId: req.user.tenantId,
+    })
       .populate("timeEntry")
       .populate("reviewedBy", "email")
       .sort({ createdAt: -1 });

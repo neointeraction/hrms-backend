@@ -22,6 +22,7 @@ exports.createEntry = async (req, res) => {
 
     const timesheetEntry = new Timesheet({
       employee: employee._id,
+      tenantId: req.user.tenantId, // Add tenantId
       date,
       project,
       task,
@@ -244,6 +245,7 @@ exports.submitTimesheets = async (req, res) => {
           employee.lastName
         } has submitted timesheets for week ending ${weekEnd.toLocaleDateString()}.`,
         relatedId: timesheets[0]._id, // Link to one of them or generic?
+        tenantId: req.user.tenantId,
       });
     }
 
