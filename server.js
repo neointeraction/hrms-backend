@@ -96,6 +96,11 @@ app.use("/api/feedback", feedbackRoutes);
 app.use("/api/badges", require("./routes/badge.routes"));
 app.use("/api/appreciation", require("./routes/appreciation.routes"));
 app.use("/api/email-automation", require("./routes/email.routes"));
+app.use("/api/asset-categories", require("./routes/assetCategory.routes"));
+app.use("/api/assets", require("./routes/asset.routes"));
+app.use("/api/asset-assignments", require("./routes/assetAssignment.routes"));
+app.use("/api/asset-incidents", require("./routes/assetIncident.routes"));
+app.use("/api/asset-history", require("./routes/assetHistory.routes"));
 
 app.get("/", (req, res) => {
   res.send("HRM RBAC API is running");

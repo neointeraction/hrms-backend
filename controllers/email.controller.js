@@ -4,20 +4,14 @@ const { processEmailAutomation } = require("../jobs/email.cron");
 
 // Get Settings for logged-in tenant
 exports.getSettings = async (req, res) => {
-  console.log("DEBUG: getSettings called by user:", req.user);
   try {
     let settings = await EmailSettings.findOne({ tenantId: req.user.tenantId });
     if (!settings) {
-      console.log(
-        "DEBUG: No settings found, creating default for tenant:",
-        req.user.tenantId
-      );
       // Create default if not exists
       settings = await EmailSettings.create({ tenantId: req.user.tenantId });
     }
     res.json(settings);
   } catch (error) {
-    console.error("DEBUG: getSettings error:", error);
     res.status(500).json({ message: error.message });
   }
 };

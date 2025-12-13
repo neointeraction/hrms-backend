@@ -28,6 +28,9 @@ const LeavePolicySchema = new mongoose.Schema(
     },
     description: { type: String },
 
+    shortCode: { type: String },
+    visibleToEmployees: { type: Boolean, default: true },
+
     // Allocation Rules
     allocation: {
       cycle: {
@@ -62,6 +65,7 @@ const LeavePolicySchema = new mongoose.Schema(
       maxConsecutive: { type: Number, default: 365 },
       allowHalfDay: { type: Boolean, default: true },
       allowOverlapHoliday: { type: Boolean, default: true },
+      allowNegative: { type: Boolean, default: false },
       requiresApproval: { type: Boolean, default: true },
     },
 

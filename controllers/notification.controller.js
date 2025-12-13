@@ -10,9 +10,6 @@ const createNotification = async ({
   tenantId, // Add tenantId
 }) => {
   try {
-    console.log(
-      `DEBUG: Creating Notification - To: ${recipient}, Type: ${type}`
-    );
     const notification = new Notification({
       recipient,
       type,
@@ -22,7 +19,7 @@ const createNotification = async ({
       tenantId,
     });
     await notification.save();
-    console.log(`DEBUG: Notification Created: ${notification._id}`);
+
     return notification;
   } catch (error) {
     console.error("Error creating notification:", error);
@@ -33,9 +30,6 @@ const createNotification = async ({
 // Get notifications for logged in user
 exports.getNotifications = async (req, res) => {
   try {
-    console.log("DEBUG: getNotifications User:", req.user.userId);
-    console.log("DEBUG: getNotifications Tenant:", req.user.tenantId);
-
     const notifications = await Notification.find({
       recipient: req.user.userId,
       tenantId: req.user.tenantId, // Filter by tenant
@@ -43,10 +37,8 @@ exports.getNotifications = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(10);
 
-    console.log("DEBUG: Found Notifications:", notifications.length);
     res.json(notifications);
   } catch (error) {
-    console.error("DEBUG: getNotifications error:", error);
     res.status(500).json({ message: error.message });
   }
 };

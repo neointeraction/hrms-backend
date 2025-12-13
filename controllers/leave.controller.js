@@ -258,8 +258,6 @@ exports.approveLeave = async (req, res) => {
       return res.status(400).json({ message: "No tenant context" });
     }
 
-    console.log(`DEBUG: approveLeave id=${id} roles=${userRoles}`);
-
     const leave = await Leave.findOne({ _id: id, tenantId }).populate({
       path: "employee",
       populate: { path: "user" },
@@ -267,8 +265,6 @@ exports.approveLeave = async (req, res) => {
     if (!leave) {
       return res.status(404).json({ message: "Leave request not found" });
     }
-
-    console.log(`DEBUG: leave.workflowStatus=${leave.workflowStatus}`);
 
     // Role-based Approval Logic
     let approved = false;
@@ -309,7 +305,6 @@ exports.approveLeave = async (req, res) => {
     }
 
     if (!approved) {
-      console.log("DEBUG: Approval failed. conditions not met.");
       return res.status(400).json({
         message: "Invalid approval action for current status or role",
       });
