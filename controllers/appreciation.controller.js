@@ -1,5 +1,6 @@
 const Appreciation = require("../models/Appreciation");
 const Employee = require("../models/Employee");
+const Post = require("../models/Post");
 
 exports.createAppreciation = async (req, res) => {
   try {
@@ -54,6 +55,23 @@ exports.createAppreciation = async (req, res) => {
       { path: "recipient", select: "firstName lastName" },
       { path: "badge" },
     ]);
+
+    // Create a Social Wall Post for this appreciation
+    const postContent = `🎖️ ${sender.firstName} ${sender.lastName} awarded "${
+      appreciation.badge.title
+    }" to ${recipient.firstName} ${recipient.lastName}\n"${message || ""}"`;
+
+    const newPost = new Post({
+      tenantId,
+      author: sender._id,
+      type: "appreciation",
+      scope: "company", // Appreciations are usually public? Or should we check settings? Defaulting to company.
+      content: postContent,
+      relatedAppreciationId: appreciation._id,
+      media: [appreciation.badge.icon], // Use badge icon as media
+    });
+
+    await newPost.save();
 
     res.status(201).json(appreciation);
   } catch (error) {

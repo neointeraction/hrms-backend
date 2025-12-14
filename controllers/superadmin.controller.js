@@ -196,7 +196,16 @@ exports.createTenant = async (req, res) => {
     };
 
     const selectedPlan = plan || "free";
-    const limits = planLimits[selectedPlan];
+    const defaultLimits = planLimits[selectedPlan];
+
+    // Merge provided limits with plan defaults if available
+    let limits = defaultLimits;
+    if (req.body.limits && req.body.limits.enabledModules) {
+      limits = {
+        ...defaultLimits,
+        enabledModules: req.body.limits.enabledModules,
+      };
+    }
 
     // Create Tenant
     const tenant = new Tenant({
@@ -218,14 +227,92 @@ exports.createTenant = async (req, res) => {
       { name: "Employee", description: "Standard Employee" },
       { name: "Intern", description: "Intern" },
       { name: "Consultant", description: "Consultant" },
+      { name: "Accountant", description: "Accountant" },
     ];
+
+    // Role Templates (based on Neointeraction tenant)
+    const roleTemplates = {
+      Admin: null, // Null means ALL enabled modules
+      Accountant: ["payroll"],
+      Consultant: [
+        "assets",
+        "leave",
+        "attendance",
+        "payroll",
+        "projects",
+        "organization",
+        "timesheet",
+      ],
+      Employee: [
+        "assets",
+        "audit",
+        "leave",
+        "attendance",
+        "payroll",
+        "projects",
+        "organization",
+        "feedback",
+        "social",
+        "tasks",
+        "timesheet",
+      ],
+      HR: [
+        "employees",
+        "assets",
+        "ai_chatbot",
+        "audit",
+        "leave",
+        "attendance",
+        "payroll",
+        "organization",
+        "feedback",
+        "social",
+        "email_automation",
+        "timesheet",
+        "policies",
+      ],
+      Intern: [
+        "assets",
+        "leave",
+        "attendance",
+        "payroll",
+        "projects",
+        "organization",
+        "feedback",
+        "social",
+        "timesheet",
+      ],
+      "Project Manager": [
+        "assets",
+        "leave",
+        "attendance",
+        "payroll",
+        "projects",
+        "organization",
+        "feedback",
+        "social",
+        "tasks",
+        "timesheet",
+      ],
+    };
 
     const createdRoles = [];
     for (const roleData of defaultRoles) {
+      const templateModules = roleTemplates[roleData.name];
+
+      // If template exists, intersect with enabled modules. If null (Admin), use all enabled modules.
+      let accessibleModules = limits.enabledModules;
+      if (templateModules) {
+        accessibleModules = templateModules.filter((m) =>
+          limits.enabledModules.includes(m)
+        );
+      }
+
       const role = new Role({
         ...roleData,
         tenantId: tenant._id,
         permissions: [],
+        accessibleModules,
       });
       await role.save();
       createdRoles.push(role);
@@ -273,18 +360,31 @@ exports.updateTenant = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Don't allow updating certain fields directly
-    delete updates._id;
-    delete updates.createdBy;
-    delete updates.createdAt;
-    delete updates.usage; // Usage should be updated via specific endpoints
+    const tenant = await Tenant.findById(id);
 
-    // If plan is being updated, update limits as well
-    if (updates.plan) {
+    if (!tenant) {
+      return res.status(404).json({ message: "Tenant not found" });
+    }
+
+    // Update basic fields
+    if (updates.companyName) tenant.companyName = updates.companyName;
+    if (updates.ownerEmail) tenant.ownerEmail = updates.ownerEmail;
+
+    // Handle subdomain uniqueness (allow clearing it)
+    if (updates.subdomain === "") {
+      tenant.subdomain = undefined;
+    } else if (updates.subdomain) {
+      tenant.subdomain = updates.subdomain;
+    }
+
+    // Handle Plan & Limits
+    if (updates.plan && updates.plan !== tenant.plan) {
+      tenant.plan = updates.plan;
+
       const planLimits = {
         free: {
           maxEmployees: 10,
-          maxStorage: 100, // MB
+          maxStorage: 100,
           enabledModules: ["attendance", "leave", "employees"],
         },
         basic: {
@@ -327,16 +427,65 @@ exports.updateTenant = async (req, res) => {
         },
       };
 
-      const newLimits = planLimits[updates.plan];
-      if (newLimits) {
-        updates.limits = newLimits;
-      }
+      const defaultLimits = planLimits[updates.plan] || planLimits.free;
+
+      // Merge default plan limits with any overrides provided in the update
+      // Taking strictly enabledModules from updates if present, other stats from plan
+      tenant.limits = {
+        ...defaultLimits,
+        ...(updates.limits || {}),
+      };
+    } else if (updates.limits) {
+      // Plan unchanged, but limits updated (e.g. module toggling)
+      // Merge deeply to avoid losing maxEmployees/maxStorage
+      tenant.limits = {
+        ...tenant.limits.toObject(), // Convert to POJO to merge
+        ...updates.limits,
+      };
     }
 
-    const tenant = await Tenant.findByIdAndUpdate(id, updates, { new: true });
+    if (
+      updates.status &&
+      ["active", "suspended", "trial", "expired"].includes(updates.status)
+    ) {
+      tenant.status = updates.status;
+    }
 
-    if (!tenant) {
-      return res.status(404).json({ message: "Tenant not found" });
+    await tenant.save();
+
+    // Sync role permissions (Remove disabled modules from all roles)
+    // If modules were updated, ensure no role has access to a disabled module
+    if (tenant.limits && tenant.limits.enabledModules) {
+      await Role.updateMany(
+        { tenantId: id },
+        {
+          $pull: {
+            accessibleModules: {
+              $nin: tenant.limits.enabledModules,
+            },
+          },
+        }
+      );
+
+      // Optional: If Admin role exists, we might want to GRANT them new modules?
+      // For now, let's just ensure they don't have access to disabled ones.
+      // But user complained "showing in admin" even when disabled.
+      // The $pull above fixes that.
+
+      // Also, let's add newly enabled modules to the "Admin" role automatically for convenience
+      const adminRole = await Role.findOne({ name: "Admin", tenantId: id });
+      if (adminRole) {
+        // Add all enabled modules to Admin
+        // Using $addToSet to avoid duplicates
+        await Role.updateOne(
+          { _id: adminRole._id },
+          {
+            $addToSet: {
+              accessibleModules: { $each: tenant.limits.enabledModules },
+            },
+          }
+        );
+      }
     }
 
     res.json({ message: "Tenant updated successfully", tenant });

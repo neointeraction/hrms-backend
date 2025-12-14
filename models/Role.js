@@ -17,6 +17,7 @@ const roleSchema = new mongoose.Schema({
       ref: "Permission",
     },
   ],
+  accessibleModules: [String],
 });
 
 // Compound index: role names unique per tenant

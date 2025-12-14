@@ -1,6 +1,7 @@
 const Badge = require("../models/Badge");
 const fs = require("fs");
 const path = require("path");
+const cloudinary = require("../config/cloudinary");
 
 exports.createBadge = async (req, res) => {
   try {
@@ -11,16 +12,31 @@ exports.createBadge = async (req, res) => {
       return res.status(400).json({ message: "Badge icon is required" });
     }
 
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: "hrms/badges",
+      resource_type: "image",
+    });
+
+    // Remove file from local storage
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
     const badge = new Badge({
       tenantId,
       title,
-      icon: `/uploads/badges/${req.file.filename}`, // Assuming standardized upload path
+      icon: result.secure_url,
     });
 
     await badge.save();
     res.status(201).json(badge);
   } catch (error) {
     console.error("Error creating badge:", error);
+    // Cleanup if something failed
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     res
       .status(500)
       .json({ message: "Failed to create badge", error: error.message });
@@ -84,16 +100,18 @@ exports.updateBadge = async (req, res) => {
     if (title) badge.title = title;
 
     if (req.file) {
-      // Delete old icon if it exists
-      const oldIconPath = path.join(__dirname, "..", badge.icon);
-      if (fs.existsSync(oldIconPath)) {
-        try {
-          fs.unlinkSync(oldIconPath);
-        } catch (err) {
-          console.error("Failed to delete old badge icon:", err);
-        }
+      // Upload new icon to Cloudinary
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: "hrms/badges",
+        resource_type: "image",
+      });
+
+      // Remove temp file
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
       }
-      badge.icon = `/uploads/badges/${req.file.filename}`;
+
+      badge.icon = result.secure_url;
     }
 
     await badge.save();

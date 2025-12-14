@@ -101,6 +101,7 @@ app.use("/api/assets", require("./routes/asset.routes"));
 app.use("/api/asset-assignments", require("./routes/assetAssignment.routes"));
 app.use("/api/asset-incidents", require("./routes/assetIncident.routes"));
 app.use("/api/asset-history", require("./routes/assetHistory.routes"));
+app.use("/api/social", require("./routes/social.routes"));
 
 app.get("/", (req, res) => {
   res.send("HRM RBAC API is running");

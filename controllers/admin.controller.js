@@ -77,7 +77,7 @@ exports.getRoles = async (req, res) => {
     }
 
     const roles = await Role.find({ tenantId }).select(
-      "name description permissions"
+      "name description permissions accessibleModules"
     );
     res.json(roles);
   } catch (err) {
@@ -89,12 +89,15 @@ exports.getRoles = async (req, res) => {
 // Create role
 exports.createRole = async (req, res) => {
   try {
-    const { name, permissions } = req.body;
+    const { name, permissions, accessibleModules } = req.body;
     if (!name) {
       return res.status(400).json({ message: "Role name is required" });
     }
 
-    const existingRole = await Role.findOne({ name });
+    const existingRole = await Role.findOne({
+      name,
+      tenantId: req.user.tenantId,
+    });
     if (existingRole) {
       return res.status(400).json({ message: "Role already exists" });
     }
@@ -102,6 +105,8 @@ exports.createRole = async (req, res) => {
     const role = new Role({
       name,
       permissions: permissions || [],
+      accessibleModules: accessibleModules || [],
+      tenantId: req.user.tenantId,
     });
 
     await role.save();
@@ -115,8 +120,11 @@ exports.createRole = async (req, res) => {
 // Update role
 exports.updateRole = async (req, res) => {
   try {
-    const { name, permissions } = req.body;
-    const role = await Role.findById(req.params.id);
+    const { name, permissions, accessibleModules } = req.body;
+    const role = await Role.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+    });
 
     if (!role) {
       return res.status(404).json({ message: "Role not found" });
@@ -124,6 +132,7 @@ exports.updateRole = async (req, res) => {
 
     if (name) role.name = name;
     if (permissions) role.permissions = permissions;
+    if (accessibleModules) role.accessibleModules = accessibleModules;
 
     await role.save();
     res.json(role);
@@ -136,12 +145,14 @@ exports.updateRole = async (req, res) => {
 // Delete role
 exports.deleteRole = async (req, res) => {
   try {
-    const role = await Role.findById(req.params.id);
+    const role = await Role.findOneAndDelete({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+    });
     if (!role) {
       return res.status(404).json({ message: "Role not found" });
     }
 
-    await Role.findByIdAndDelete(req.params.id);
     res.json({ message: "Role deleted successfully" });
   } catch (err) {
     console.error(err);

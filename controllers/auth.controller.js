@@ -64,7 +64,7 @@ exports.login = async (req, res) => {
           path: "permissions",
         },
       })
-      .populate("tenantId", "companyName status"); // Populate tenant details
+      .populate("tenantId", "companyName status limits"); // Populate tenant details with limits
 
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
@@ -175,10 +175,16 @@ exports.login = async (req, res) => {
       bankName: user.bankName,
       bankAccountNo: user.bankAccountNo,
       tenantId: user.tenantId
-        ? { _id: user.tenantId._id, companyName: user.tenantId.companyName }
+        ? {
+            _id: user.tenantId._id,
+            companyName: user.tenantId.companyName,
+            status: user.tenantId.status,
+            limits: user.tenantId.limits, // Include limits
+          }
         : null,
       isSuperAdmin: user.isSuperAdmin,
       isCompanyAdmin: user.isCompanyAdmin,
+      accessibleModules: user.roles?.[0]?.accessibleModules || [],
     };
 
     res.json({ token, user: responseUser });
@@ -194,7 +200,7 @@ exports.getMe = async (req, res) => {
     const user = await User.findById(req.user.userId)
       .select("-passwordHash")
       .populate("roles")
-      .populate("tenantId", "companyName status"); // Populate tenant details
+      .populate("tenantId", "companyName status limits"); // Populate tenant details with limits
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -223,7 +229,8 @@ exports.getMe = async (req, res) => {
         employeeId: user.employeeId,
         department: user.department,
         designation: employee ? employee.designation : null,
-        roles: user.roles.map((r) => r.name),
+        roles: user.roles, // Return full objects
+        accessibleModules: user.roles?.[0]?.accessibleModules || [], // Flatten for ease
         avatar:
           employee && employee.profilePicture
             ? `${process.env.BASE_URL || "http://localhost:5001"}/${
@@ -231,7 +238,12 @@ exports.getMe = async (req, res) => {
               }`
             : null,
         tenantId: user.tenantId
-          ? { _id: user.tenantId._id, companyName: user.tenantId.companyName }
+          ? {
+              _id: user.tenantId._id,
+              companyName: user.tenantId.companyName,
+              status: user.tenantId.status,
+              limits: user.tenantId.limits, // Include limits
+            }
           : null,
         isSuperAdmin: user.isSuperAdmin || false,
         isCompanyAdmin: user.isCompanyAdmin || false,
