@@ -6,8 +6,11 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
+const os = require("os");
+
 // Setup Multer for temp storage before Cloudinary upload
-const uploadDir = "uploads/temp";
+// Use system temp directory ensures compatibility with readonly filesystems (like Vercel/Lambda)
+const uploadDir = path.join(os.tmpdir(), "hrms-uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
