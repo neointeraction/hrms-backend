@@ -20,14 +20,15 @@ exports.getCompanySettings = async (req, res) => {
       company: {
         name: tenant.companyName,
         subdomain: tenant.subdomain,
-        timezone: tenant.companySettings?.timezone || "America/New_York",
-        currency: tenant.companySettings?.currency || "USD",
-        workHours: tenant.companySettings?.workHours || {
+        timezone: tenant.settings?.timezone || "America/New_York",
+        currency: tenant.settings?.currency || "USD",
+        workHours: tenant.settings?.workingHours || {
           start: "09:00",
           end: "18:00",
         },
-        logo: tenant.companySettings?.logo,
-        dateFormat: tenant.companySettings?.dateFormat || "MM/DD/YYYY",
+        logo: tenant.settings?.logo,
+        favicon: tenant.settings?.favicon,
+        dateFormat: tenant.settings?.dateFormat || "MM/DD/YYYY",
         ownerEmail: tenant.ownerEmail,
       },
     });
@@ -36,6 +37,9 @@ exports.getCompanySettings = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 /**
  * PUT /api/settings/company
@@ -66,14 +70,46 @@ exports.updateCompanySettings = async (req, res) => {
     if (companyName) tenant.companyName = companyName;
 
     // Update company settings
-    if (!tenant.companySettings) {
-      tenant.companySettings = {};
+    // FIX: Using 'settings' instead of 'companySettings' to match Schema
+    if (!tenant.settings) {
+      tenant.settings = {};
     }
 
-    if (timezone) tenant.companySettings.timezone = timezone;
-    if (currency) tenant.companySettings.currency = currency;
-    if (workHours) tenant.companySettings.workHours = workHours;
-    if (dateFormat) tenant.companySettings.dateFormat = dateFormat;
+    if (timezone) tenant.settings.timezone = timezone;
+    if (currency) tenant.settings.currency = currency;
+    // Handle workHours which might be passed as string or object
+    if (workHours) {
+      tenant.settings.workingHours =
+        typeof workHours === "string" ? JSON.parse(workHours) : workHours;
+    }
+    if (dateFormat) tenant.settings.dateFormat = dateFormat;
+
+    // Handle File Uploads (Logo & Favicon)
+    if (req.files) {
+      if (req.files.logo) {
+        const result = await cloudinary.uploader.upload(
+          req.files.logo[0].path,
+          {
+            folder: `hrms/tenants/${tenantId}/branding`,
+          }
+        );
+        tenant.settings.logo = result.secure_url;
+        // Clean up temp file
+        fs.unlinkSync(req.files.logo[0].path);
+      }
+
+      if (req.files.favicon) {
+        const result = await cloudinary.uploader.upload(
+          req.files.favicon[0].path,
+          {
+            folder: `hrms/tenants/${tenantId}/branding`,
+          }
+        );
+        tenant.settings.favicon = result.secure_url;
+        // Clean up temp file
+        fs.unlinkSync(req.files.favicon[0].path);
+      }
+    }
 
     await tenant.save();
 
@@ -82,15 +118,25 @@ exports.updateCompanySettings = async (req, res) => {
       company: {
         name: tenant.companyName,
         subdomain: tenant.subdomain,
-        timezone: tenant.companySettings.timezone,
-        currency: tenant.companySettings.currency,
-        workHours: tenant.companySettings.workHours,
-        dateFormat: tenant.companySettings.dateFormat,
+        timezone: tenant.settings.timezone,
+        currency: tenant.settings.currency,
+        workHours: tenant.settings.workingHours,
+        dateFormat: tenant.settings.dateFormat,
         ownerEmail: tenant.ownerEmail,
+        logo: tenant.settings.logo,
+        favicon: tenant.settings.favicon,
       },
     });
   } catch (error) {
     console.error("Update company settings error:", error);
+    // Cleanup files if error occurred
+    if (req.files) {
+      Object.values(req.files)
+        .flat()
+        .forEach((file) => {
+          if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        });
+    }
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

@@ -99,6 +99,8 @@ const tenantSchema = new mongoose.Schema(
       currency: { type: String, default: "INR" },
       dateFormat: { type: String, default: "DD/MM/YYYY" },
       weekStartsOn: { type: Number, default: 1 }, // 0 = Sunday, 1 = Monday
+      logo: { type: String }, // URL to company logo
+      favicon: { type: String }, // URL to company favicon
     },
 
     // Meta

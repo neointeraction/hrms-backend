@@ -64,7 +64,7 @@ exports.login = async (req, res) => {
           path: "permissions",
         },
       })
-      .populate("tenantId", "companyName status limits"); // Populate tenant details with limits
+      .populate("tenantId", "companyName status limits settings"); // Populate tenant details with limits and settings
 
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
@@ -179,7 +179,8 @@ exports.login = async (req, res) => {
             _id: user.tenantId._id,
             companyName: user.tenantId.companyName,
             status: user.tenantId.status,
-            limits: user.tenantId.limits, // Include limits
+            limits: user.tenantId.limits,
+            settings: user.tenantId.settings, // Include settings
           }
         : null,
       isSuperAdmin: user.isSuperAdmin,
@@ -200,7 +201,7 @@ exports.getMe = async (req, res) => {
     const user = await User.findById(req.user.userId)
       .select("-passwordHash")
       .populate("roles")
-      .populate("tenantId", "companyName status limits"); // Populate tenant details with limits
+      .populate("tenantId", "companyName status limits settings"); // Populate tenant details with limits and settings
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -242,7 +243,8 @@ exports.getMe = async (req, res) => {
               _id: user.tenantId._id,
               companyName: user.tenantId.companyName,
               status: user.tenantId.status,
-              limits: user.tenantId.limits, // Include limits
+              limits: user.tenantId.limits,
+              settings: user.tenantId.settings, // Include settings
             }
           : null,
         isSuperAdmin: user.isSuperAdmin || false,
