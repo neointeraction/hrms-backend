@@ -21,7 +21,7 @@ mongoose
     const notifications = users.map((user) => ({
       recipient: user._id,
       type: "SYSTEM",
-      title: "Welcome to HRMS Notifications",
+      title: "Welcome to NeointeractionHR Notifications",
       message: "This is a test notification to verify the system.",
       read: false,
       createdAt: new Date(),

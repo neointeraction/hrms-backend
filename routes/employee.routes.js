@@ -7,17 +7,30 @@ const multer = require("multer");
 const path = require("path");
 
 // Multer Config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    // Unique name: timestamp-basename(orig)-ext
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    );
+const cloudinary = require("../config/cloudinary");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+// Cloudinary Storage Config
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "hrms/employees", // Keep it simple or use function
+    format: async (req, file) => {
+      // computed format
+      const ext = path.extname(file.originalname).substring(1);
+      return ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpeg";
+    },
+    public_id: (req, file) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      return file.fieldname + "-" + uniqueSuffix;
+    },
+    // Use a function for folder to support multi-tenancy organization if desired
+    folder: (req, file) => {
+      if (req.user && req.user.tenantId) {
+        return `hrms/tenants/${req.user.tenantId}/employees`;
+      }
+      return `hrms/employees`;
+    },
   },
 });
 

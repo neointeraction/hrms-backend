@@ -114,7 +114,7 @@ exports.login = async (req, res) => {
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: "1h",
+      expiresIn: "24h",
     });
 
     // Track Login History
@@ -234,9 +234,11 @@ exports.getMe = async (req, res) => {
         accessibleModules: user.roles?.[0]?.accessibleModules || [], // Flatten for ease
         avatar:
           employee && employee.profilePicture
-            ? `${process.env.BASE_URL || "http://localhost:5001"}/${
-                employee.profilePicture
-              }`
+            ? employee.profilePicture.startsWith("http")
+              ? employee.profilePicture
+              : `${process.env.BASE_URL || "http://localhost:5001"}/${
+                  employee.profilePicture
+                }`
             : null,
         tenantId: user.tenantId
           ? {

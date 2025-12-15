@@ -302,14 +302,19 @@ exports.updateEmployee = async (req, res) => {
 
     // IMPORTANT: Update User role if changed
     if (req.body.role) {
-      const newRole = await Role.findOne({ name: req.body.role });
+      const tenantId = req.user.tenantId; // Get tenantId from user context
+      const newRole = await Role.findOne({
+        name: req.body.role,
+        tenantId: tenantId,
+      });
+
       if (newRole) {
         await User.findByIdAndUpdate(employee.user, {
           roles: [newRole._id],
         });
       } else {
         console.warn(
-          `Role '${req.body.role}' not found, User roles not updated`
+          `Role '${req.body.role}' not found in tenant ${tenantId}, User roles not updated`
         );
       }
     }

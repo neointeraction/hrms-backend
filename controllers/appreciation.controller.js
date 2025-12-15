@@ -85,16 +85,21 @@ exports.createAppreciation = async (req, res) => {
 exports.getAppreciations = async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
-    // Optional filters: by recipient, by sender
     const { recipientId } = req.query;
 
     let query = { tenantId };
 
     if (recipientId) {
-      // If filtering by recipient, we need to map the User ID to Employee ID first, or assume Employee ID passed?
-      // Let's assume query param might be just passed as is.
-      // For simplicity, let's just return all for tenant if no specific filter, or handle later.
-      // The requirement is mostly about creation flow.
+      const employee = await Employee.findOne({
+        user: recipientId,
+        tenantId,
+      });
+
+      if (employee) {
+        query.recipient = employee._id;
+      } else {
+        return res.json([]);
+      }
     }
 
     const appreciations = await Appreciation.find(query)

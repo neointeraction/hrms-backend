@@ -123,6 +123,15 @@ exports.getTenantById = async (req, res) => {
 // Create Tenant (Manual)
 exports.createTenant = async (req, res) => {
   try {
+    // Parse limits if it comes as a string (from FormData)
+    if (typeof req.body.limits === "string") {
+      try {
+        req.body.limits = JSON.parse(req.body.limits);
+      } catch (e) {
+        console.error("Failed to parse limits:", e);
+      }
+    }
+
     const { companyName, ownerEmail, plan, subdomain } = req.body;
 
     // Validate required fields
@@ -207,6 +216,17 @@ exports.createTenant = async (req, res) => {
       };
     }
 
+    // Branding - Handle File Uploads
+    const settings = {};
+    if (req.files) {
+      if (req.files.logo && req.files.logo[0]) {
+        settings.logo = req.files.logo[0].path;
+      }
+      if (req.files.favicon && req.files.favicon[0]) {
+        settings.favicon = req.files.favicon[0].path;
+      }
+    }
+
     // Create Tenant
     const tenant = new Tenant({
       companyName,
@@ -215,6 +235,7 @@ exports.createTenant = async (req, res) => {
       plan: selectedPlan,
       status: "active",
       limits,
+      settings, // Add settings with branding
       createdBy: req.user.userId, // Super Admin who created it
     });
     await tenant.save();
@@ -357,6 +378,15 @@ exports.createTenant = async (req, res) => {
 // Update Tenant
 exports.updateTenant = async (req, res) => {
   try {
+    // Parse limits if it comes as a string (from FormData)
+    if (typeof req.body.limits === "string") {
+      try {
+        req.body.limits = JSON.parse(req.body.limits);
+      } catch (e) {
+        console.error("Failed to parse limits:", e);
+      }
+    }
+
     const { id } = req.params;
     const updates = req.body;
 
@@ -364,6 +394,21 @@ exports.updateTenant = async (req, res) => {
 
     if (!tenant) {
       return res.status(404).json({ message: "Tenant not found" });
+    }
+
+    // Branding - Handle File Uploads
+    if (req.files) {
+      if (!tenant.settings) tenant.settings = {};
+
+      if (req.files.logo && req.files.logo[0]) {
+        tenant.settings.logo = req.files.logo[0].path;
+      }
+      if (req.files.favicon && req.files.favicon[0]) {
+        tenant.settings.favicon = req.files.favicon[0].path;
+      }
+
+      // Explicitly mark settings as modified to ensure Mongoose saves changes to mixed/nested types
+      tenant.markModified("settings");
     }
 
     // Update basic fields
