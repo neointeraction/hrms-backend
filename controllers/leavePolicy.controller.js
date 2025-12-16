@@ -16,9 +16,14 @@ exports.createPolicy = async (req, res) => {
     // Handle file upload
     if (req.file) {
       if (!policyData.docs) policyData.docs = {};
-      // Local storage path: "uploads/filename.ext". We want "/uploads/filename.ext" for URL.
-      const filename = req.file.filename;
-      policyData.docs.documentUrl = `/uploads/${filename}`;
+      // Hybrid: If Cloudinary, path is URL. If Local, path is FS path.
+      // Easiest is to check if req.file.path starts with 'http'
+      if (req.file.path && req.file.path.startsWith("http")) {
+        policyData.docs.documentUrl = req.file.path;
+      } else {
+        // Local: use filename to build relative URL
+        policyData.docs.documentUrl = `/uploads/${req.file.filename}`;
+      }
     }
 
     const policy = new LeavePolicy({
@@ -79,7 +84,12 @@ exports.updatePolicy = async (req, res) => {
     }
 
     // Handle file upload
-    const getFileUrl = (file) => `/uploads/${file.filename}`;
+    const getFileUrl = (file) => {
+      if (file.path && file.path.startsWith("http")) {
+        return file.path;
+      }
+      return `/uploads/${file.filename}`;
+    };
 
     if (req.file) {
       // Simplest: If req.body is plain object and we have file:
