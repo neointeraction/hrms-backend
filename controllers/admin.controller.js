@@ -77,7 +77,7 @@ exports.getRoles = async (req, res) => {
     }
 
     const roles = await Role.find({ tenantId }).select(
-      "name description permissions accessibleModules"
+      "name description permissions accessibleModules mandatoryDocuments"
     );
     res.json(roles);
   } catch (err) {
@@ -89,7 +89,8 @@ exports.getRoles = async (req, res) => {
 // Create role
 exports.createRole = async (req, res) => {
   try {
-    const { name, permissions, accessibleModules } = req.body;
+    const { name, permissions, accessibleModules, mandatoryDocuments } =
+      req.body;
     if (!name) {
       return res.status(400).json({ message: "Role name is required" });
     }
@@ -106,6 +107,7 @@ exports.createRole = async (req, res) => {
       name,
       permissions: permissions || [],
       accessibleModules: accessibleModules || [],
+      mandatoryDocuments: mandatoryDocuments || [],
       tenantId: req.user.tenantId,
     });
 
@@ -120,7 +122,8 @@ exports.createRole = async (req, res) => {
 // Update role
 exports.updateRole = async (req, res) => {
   try {
-    const { name, permissions, accessibleModules } = req.body;
+    const { name, permissions, accessibleModules, mandatoryDocuments } =
+      req.body;
     const role = await Role.findOne({
       _id: req.params.id,
       tenantId: req.user.tenantId,
@@ -133,6 +136,7 @@ exports.updateRole = async (req, res) => {
     if (name) role.name = name;
     if (permissions) role.permissions = permissions;
     if (accessibleModules) role.accessibleModules = accessibleModules;
+    if (mandatoryDocuments) role.mandatoryDocuments = mandatoryDocuments;
 
     await role.save();
     res.json(role);

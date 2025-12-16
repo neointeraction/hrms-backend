@@ -18,6 +18,12 @@ const roleSchema = new mongoose.Schema({
     },
   ],
   accessibleModules: [String],
+  mandatoryDocuments: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DocumentType",
+    },
+  ],
 });
 
 // Compound index: role names unique per tenant

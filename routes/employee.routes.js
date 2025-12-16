@@ -7,30 +7,22 @@ const multer = require("multer");
 const path = require("path");
 
 // Multer Config
-const cloudinary = require("../config/cloudinary");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const fs = require("fs");
 
-// Cloudinary Storage Config
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "hrms/employees", // Keep it simple or use function
-    format: async (req, file) => {
-      // computed format
-      const ext = path.extname(file.originalname).substring(1);
-      return ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpeg";
-    },
-    public_id: (req, file) => {
-      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      return file.fieldname + "-" + uniqueSuffix;
-    },
-    // Use a function for folder to support multi-tenancy organization if desired
-    folder: (req, file) => {
-      if (req.user && req.user.tenantId) {
-        return `hrms/tenants/${req.user.tenantId}/employees`;
-      }
-      return `hrms/employees`;
-    },
+// Local Disk Storage Config
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    let uploadPath = "uploads/employees";
+    if (req.user && req.user.tenantId) {
+      uploadPath = `uploads/tenants/${req.user.tenantId}/employees`;
+    }
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
   },
 });
 

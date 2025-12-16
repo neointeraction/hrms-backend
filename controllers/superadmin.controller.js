@@ -220,10 +220,10 @@ exports.createTenant = async (req, res) => {
     const settings = {};
     if (req.files) {
       if (req.files.logo && req.files.logo[0]) {
-        settings.logo = req.files.logo[0].path;
+        settings.logo = req.files.logo[0].path.replace(/\\/g, "/");
       }
       if (req.files.favicon && req.files.favicon[0]) {
-        settings.favicon = req.files.favicon[0].path;
+        settings.favicon = req.files.favicon[0].path.replace(/\\/g, "/");
       }
     }
 
@@ -401,10 +401,10 @@ exports.updateTenant = async (req, res) => {
       if (!tenant.settings) tenant.settings = {};
 
       if (req.files.logo && req.files.logo[0]) {
-        tenant.settings.logo = req.files.logo[0].path;
+        tenant.settings.logo = req.files.logo[0].path.replace(/\\/g, "/");
       }
       if (req.files.favicon && req.files.favicon[0]) {
-        tenant.settings.favicon = req.files.favicon[0].path;
+        tenant.settings.favicon = req.files.favicon[0].path.replace(/\\/g, "/");
       }
 
       // Explicitly mark settings as modified to ensure Mongoose saves changes to mixed/nested types
