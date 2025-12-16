@@ -116,3 +116,25 @@ exports.getAppreciations = async (req, res) => {
       .json({ message: "Failed to fetch appreciations", error: error.message });
   }
 };
+
+exports.markAsSeen = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "No appreciation IDs provided" });
+    }
+
+    await Appreciation.updateMany(
+      { _id: { $in: ids }, tenantId: req.user.tenantId },
+      { $set: { isSeen: true } }
+    );
+
+    res.json({ message: "Appreciations marked as seen" });
+  } catch (error) {
+    console.error("Error marking appreciations as seen:", error);
+    res.status(500).json({
+      message: "Failed to mark appreciations as seen",
+      error: error.message,
+    });
+  }
+};

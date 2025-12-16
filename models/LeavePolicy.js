@@ -74,6 +74,7 @@ const LeavePolicySchema = new mongoose.Schema(
       requiredAfter: { type: Number, default: 0 }, // Days
       mandatory: { type: Boolean, default: false },
       allowedTypes: [{ type: String }], // pdf, jpg, etc.
+      documentUrl: { type: String }, // Policy Document URL
     },
 
     status: {

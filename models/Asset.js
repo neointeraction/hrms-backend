@@ -60,6 +60,9 @@ const assetSchema = new mongoose.Schema(
     invoice: {
       type: String, // File path
     },
+    image: {
+      type: String, // File path for asset image
+    },
     customFieldValues: {
       type: mongoose.Schema.Types.Mixed, // Dynamic object based on category
     },

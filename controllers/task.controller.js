@@ -13,18 +13,25 @@ exports.createTask = async (req, res) => {
       milestone,
     } = req.body;
 
-    const task = new Task({
+    // Validate Status/Priority? Mongoose does it, but we can prevent 500 if we want custom message.
+
+    // Handle empty assignee which causes CastError
+    const taskData = {
       project,
       title,
       description,
-      assignee,
       priority,
       dueDate,
       milestone,
-      milestone,
       createdBy: req.user.userId,
       tenantId: req.user.tenantId, // Add tenantId
-    });
+    };
+
+    if (assignee && assignee.trim() !== "") {
+      taskData.assignee = assignee;
+    }
+
+    const task = new Task(taskData);
 
     await task.save();
     res.status(201).json({ message: "Task created successfully", task });

@@ -13,6 +13,13 @@ exports.calculatePayroll = async (req, res) => {
       return res.status(400).json({ message: "No tenant context" });
     }
 
+    console.log("[DEBUG] calculatePayroll Request:", {
+      employeeId,
+      month,
+      year,
+      tenantId,
+    });
+
     // 1. Fetch Salary Structure
     const structure = await SalaryStructure.findOne({
       employee: employeeId,
@@ -67,7 +74,17 @@ exports.calculatePayroll = async (req, res) => {
     const netSalary = grossSalary - totalDeductions;
 
     // 5. Create/Update Payroll Record (Draft)
+    console.log("[DEBUG] Searching for existing payroll with:", {
+      employee: employeeId,
+      month,
+      year,
+    });
     let payroll = await Payroll.findOne({ employee: employeeId, month, year });
+    console.log(
+      "[DEBUG] Payroll found?",
+      !!payroll,
+      payroll ? payroll._id : "null"
+    );
 
     if (payroll) {
       if (payroll.status === "Paid") {

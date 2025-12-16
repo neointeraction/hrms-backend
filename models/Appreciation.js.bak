@@ -24,10 +24,6 @@ const appreciationSchema = new mongoose.Schema({
   message: {
     type: String,
   },
-  isSeen: {
-    type: Boolean,
-    default: false,
-  },
   createdAt: {
     type: Date,
     default: Date.now,

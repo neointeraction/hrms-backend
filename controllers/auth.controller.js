@@ -185,7 +185,13 @@ exports.login = async (req, res) => {
         : null,
       isSuperAdmin: user.isSuperAdmin,
       isCompanyAdmin: user.isCompanyAdmin,
-      accessibleModules: user.roles?.[0]?.accessibleModules || [],
+      accessibleModules: (user.roles?.[0]?.accessibleModules || []).filter(
+        (m) =>
+          !user.tenantId ||
+          !user.tenantId.limits ||
+          !user.tenantId.limits.enabledModules ||
+          user.tenantId.limits.enabledModules.includes(m)
+      ),
     };
 
     res.json({ token, user: responseUser });
@@ -231,7 +237,13 @@ exports.getMe = async (req, res) => {
         department: user.department,
         designation: employee ? employee.designation : null,
         roles: user.roles, // Return full objects
-        accessibleModules: user.roles?.[0]?.accessibleModules || [], // Flatten for ease
+        accessibleModules: (user.roles?.[0]?.accessibleModules || []).filter(
+          (m) =>
+            !user.tenantId ||
+            !user.tenantId.limits ||
+            !user.tenantId.limits.enabledModules ||
+            user.tenantId.limits.enabledModules.includes(m)
+        ), // Flatten for ease
         avatar:
           employee && employee.profilePicture
             ? employee.profilePicture.startsWith("http")

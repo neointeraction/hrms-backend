@@ -236,6 +236,10 @@ exports.updateEmployee = async (req, res) => {
     // Clean data - remove empty strings for ObjectId and enum fields
     const cleanedData = { ...req.body };
 
+    // Security: Explicitly remove password fields to prevent accidental updates
+    delete cleanedData.password;
+    delete cleanedData.passwordHash;
+
     if (req.file) {
       cleanedData.profilePicture = req.file.path.replace(/\\/g, "/");
     }

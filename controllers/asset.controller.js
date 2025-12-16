@@ -55,6 +55,7 @@ exports.createAsset = async (req, res) => {
       notes,
       tenantId: req.user.tenantId,
       createdBy: req.user.userId,
+      image: req.file ? req.file.path : undefined,
     });
 
     await asset.save();
@@ -189,6 +190,9 @@ exports.updateAsset = async (req, res) => {
     if (currentValue !== undefined) asset.currentValue = currentValue;
     if (customFieldValues) asset.customFieldValues = customFieldValues;
     if (notes !== undefined) asset.notes = notes;
+    if (req.file) {
+      asset.image = req.file.path;
+    }
     asset.updatedBy = req.user.userId;
 
     await asset.save();

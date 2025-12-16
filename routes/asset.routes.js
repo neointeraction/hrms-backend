@@ -5,45 +5,11 @@ const {
   authenticateToken,
   authorize,
 } = require("../middleware/auth.middleware");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
-// Configure multer for invoice uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, "../uploads/assets/invoices");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    );
-  },
-});
+const { upload } = require("../config/cloudinary");
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|pdf/;
-    const extname = allowedTypes.test(
-      path.extname(file.originalname).toLowerCase()
-    );
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (extname && mimetype) {
-      return cb(null, true);
-    } else {
-      cb(new Error("Only images and PDF files are allowed"));
-    }
-  },
-});
+// Configure multer for asset uploads (handled by Cloudinary config)
+// Removing local disk storage configuration
 
 // All routes require authentication
 router.use(authenticateToken);
@@ -52,7 +18,12 @@ router.use(authenticateToken);
 router.get("/stats", authorize(["admin", "hr"]), assetController.getAssetStats);
 
 // Create asset (admin/hr only)
-router.post("/", authorize(["admin", "hr"]), assetController.createAsset);
+router.post(
+  "/",
+  authorize(["admin", "hr"]),
+  upload.single("image"),
+  assetController.createAsset
+);
 
 // Get all assets (with filters)
 router.get("/", assetController.getAssets);
@@ -61,7 +32,12 @@ router.get("/", assetController.getAssets);
 router.get("/:id", assetController.getAssetById);
 
 // Update asset (admin/hr only)
-router.put("/:id", authorize(["admin", "hr"]), assetController.updateAsset);
+router.put(
+  "/:id",
+  authorize(["admin", "hr"]),
+  upload.single("image"),
+  assetController.updateAsset
+);
 
 // Delete asset (admin/hr only)
 router.delete("/:id", authorize(["admin", "hr"]), assetController.deleteAsset);

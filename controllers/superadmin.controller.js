@@ -500,6 +500,11 @@ exports.updateTenant = async (req, res) => {
 
     // Sync role permissions (Remove disabled modules from all roles)
     // If modules were updated, ensure no role has access to a disabled module
+    // Sync role permissions (Remove disabled modules from all roles)
+    // If modules were updated, ensure no role has access to a disabled module
+    /* 
+    // MODIFICATION: Commented out to preserve role configuration. 
+    // We will filter active modules at runtime (login/getMe) instead of deleting them from DB.
     if (tenant.limits && tenant.limits.enabledModules) {
       await Role.updateMany(
         { tenantId: id },
@@ -511,11 +516,6 @@ exports.updateTenant = async (req, res) => {
           },
         }
       );
-
-      // Optional: If Admin role exists, we might want to GRANT them new modules?
-      // For now, let's just ensure they don't have access to disabled ones.
-      // But user complained "showing in admin" even when disabled.
-      // The $pull above fixes that.
 
       // Also, let's add newly enabled modules to the "Admin" role automatically for convenience
       const adminRole = await Role.findOne({ name: "Admin", tenantId: id });
@@ -532,6 +532,7 @@ exports.updateTenant = async (req, res) => {
         );
       }
     }
+    */
 
     res.json({ message: "Tenant updated successfully", tenant });
   } catch (error) {
