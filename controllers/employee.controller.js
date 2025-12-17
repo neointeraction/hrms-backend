@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Employee = require("../models/Employee");
 const User = require("../models/User");
 const Role = require("../models/Role");
+const Designation = require("../models/Designation");
 const bcrypt = require("bcryptjs");
 
 // Create a new employee (and corresponding user)
@@ -124,6 +125,17 @@ exports.createEmployee = async (req, res) => {
       }
     });
 
+    // Handle Designation logic
+    if (cleanedData.designationId) {
+      const design = await Designation.findOne({
+        _id: cleanedData.designationId,
+        tenantId,
+      });
+      if (design) {
+        cleanedData.designation = design.name;
+      }
+    }
+
     // 5. Create Employee Profile
     const newEmployee = new Employee({
       user: newUser._id,
@@ -242,6 +254,17 @@ exports.updateEmployee = async (req, res) => {
 
     if (req.file) {
       cleanedData.profilePicture = req.file.path.replace(/\\/g, "/");
+    }
+
+    // Handle Designation logic for Update
+    if (cleanedData.designationId) {
+      const design = await Designation.findOne({
+        _id: cleanedData.designationId,
+        tenantId: req.user.tenantId,
+      });
+      if (design) {
+        cleanedData.designation = design.name;
+      }
     }
 
     // Parse JSON fields (Handle FormData strings)
