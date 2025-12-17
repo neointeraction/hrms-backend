@@ -226,7 +226,10 @@ exports.getMe = async (req, res) => {
     });
 
     const Employee = require("../models/Employee");
-    const employee = await Employee.findOne({ user: user._id });
+    const employee = await Employee.findOne({ user: user._id }).populate(
+      "shiftId",
+      "name startTime endTime workingDays breakDuration gracePeriod"
+    );
 
     res.json({
       user: {
@@ -261,6 +264,7 @@ exports.getMe = async (req, res) => {
               settings: user.tenantId.settings, // Include settings
             }
           : null,
+        shiftId: employee?.shiftId || null, // Include shift information
         isSuperAdmin: user.isSuperAdmin || false,
         isCompanyAdmin: user.isCompanyAdmin || false,
       },

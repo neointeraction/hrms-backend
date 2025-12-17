@@ -31,6 +31,10 @@ const employeeSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Designation",
     },
+    shiftId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shift",
+    },
     role: { type: String }, // Can be redundant with User role, but good for display
     employmentType: {
       type: String,

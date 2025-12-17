@@ -136,6 +136,19 @@ exports.createEmployee = async (req, res) => {
       }
     }
 
+    // Handle Shift logic
+    if (cleanedData.shiftId) {
+      // Validate Shift exists
+      const Shift = require("../models/Shift");
+      const shift = await Shift.findOne({
+        _id: cleanedData.shiftId,
+        tenantId,
+      });
+      if (!shift) {
+        delete cleanedData.shiftId; // Invalid shift, ignore
+      }
+    }
+
     // 5. Create Employee Profile
     const newEmployee = new Employee({
       user: newUser._id,
@@ -185,6 +198,9 @@ exports.getEmployees = async (req, res) => {
     const employees = await Employee.find({ tenantId: req.user.tenantId })
       .populate("user", "status roles")
       .populate("reportingManager", "firstName lastName")
+      .populate("user", "status roles")
+      .populate("reportingManager", "firstName lastName")
+      .populate("shiftId", "name startTime endTime")
       .lean(); // Use lean() to allow adding properties
 
     // Fetch active time entries for this tenant for today/current status
@@ -256,19 +272,7 @@ exports.updateEmployee = async (req, res) => {
       cleanedData.profilePicture = req.file.path.replace(/\\/g, "/");
     }
 
-    // Handle Designation logic for Update
-    if (cleanedData.designationId) {
-      const design = await Designation.findOne({
-        _id: cleanedData.designationId,
-        tenantId: req.user.tenantId,
-      });
-      if (design) {
-        cleanedData.designation = design.name;
-      }
-    }
-
-    // Parse JSON fields (Handle FormData strings)
-    // Parse JSON fields (Handle FormData strings)
+    // Parse JSON fields (Handle FormData strings) - DO THIS FIRST
     const jsonFields = [
       "workExperience",
       "education",
@@ -287,9 +291,15 @@ exports.updateEmployee = async (req, res) => {
       }
     });
 
-    // Remove empty string for reportingManager (ObjectId field)
+    // Remove empty strings for ObjectId fields - DO THIS BEFORE USING THEM
     if (cleanedData.reportingManager === "") {
       delete cleanedData.reportingManager;
+    }
+    if (cleanedData.designationId === "") {
+      delete cleanedData.designationId;
+    }
+    if (cleanedData.shiftId === "") {
+      delete cleanedData.shiftId;
     }
 
     // Remove empty strings for enum fields
@@ -304,6 +314,29 @@ exports.updateEmployee = async (req, res) => {
         delete cleanedData[field];
       }
     });
+
+    // NOW handle Designation logic for Update (after cleanup)
+    if (cleanedData.designationId) {
+      const design = await Designation.findOne({
+        _id: cleanedData.designationId,
+        tenantId: req.user.tenantId,
+      });
+      if (design) {
+        cleanedData.designation = design.name;
+      }
+    }
+
+    // Handle Shift logic for Update (after cleanup)
+    if (cleanedData.shiftId) {
+      const Shift = require("../models/Shift");
+      const shift = await Shift.findOne({
+        _id: cleanedData.shiftId,
+        tenantId: req.user.tenantId,
+      });
+      if (!shift) {
+        delete cleanedData.shiftId; // Invalid shift, ignore
+      }
+    }
 
     const employee = await Employee.findByIdAndUpdate(
       req.params.id,

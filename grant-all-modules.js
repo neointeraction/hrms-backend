@@ -19,7 +19,10 @@ const ALL_MODULES = [
   "email_automation",
   "tasks",
   "timesheet",
+  "shifts",
+  "attendance",
   "policies",
+  "documents",
 ];
 
 async function grantAllModules() {
