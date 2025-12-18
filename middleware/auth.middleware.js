@@ -44,25 +44,15 @@ exports.authorize = (allowedRoles = []) => {
   }
 
   return (req, res, next) => {
-    console.log("[DEBUG] authorize middleware:");
-    console.log("  - req.user:", req.user);
-    console.log("  - req.user.roles:", req.user?.roles);
-    console.log("  - allowed roles:", allowedRoles);
-
     if (!req.user) {
       return res.status(403).json({ message: "Access denied: No user found" });
     }
 
-    // Check if user has roles array and if any of user's roles match allowed roles
     const userRoles = req.user.roles || [];
     const normalizedAllowed = allowedRoles.map((r) => r.toLowerCase());
     const hasMatchingRole = userRoles.some((userRole) =>
       normalizedAllowed.includes(userRole.toLowerCase())
     );
-
-    console.log("  - user roles:", userRoles);
-    console.log("  - role match:", hasMatchingRole);
-
     if (allowedRoles.length && !hasMatchingRole) {
       return res
         .status(403)

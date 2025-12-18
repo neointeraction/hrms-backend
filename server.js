@@ -72,6 +72,7 @@ const auditRoutes = require("./routes/audit.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const aiRoutes = require("./routes/ai.routes");
 const feedbackRoutes = require("./routes/feedback.routes");
+const resignationRoutes = require("./routes/resignation.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/hr", hrRoutes);
@@ -93,6 +94,8 @@ app.use("/api/superadmin", require("./routes/superadmin.routes"));
 app.use("/api/registration", require("./routes/registration.routes"));
 app.use("/api/settings", require("./routes/settings.routes"));
 app.use("/api/feedback", feedbackRoutes);
+app.use("/api/resignations", resignationRoutes);
+app.use("/api/clearance", require("./routes/clearance.routes"));
 app.use("/api/badges", require("./routes/badge.routes"));
 app.use("/api/appreciation", require("./routes/appreciation.routes"));
 app.use("/api/email-automation", require("./routes/email.routes"));
