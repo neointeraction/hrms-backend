@@ -205,7 +205,12 @@ exports.getMyPayslips = async (req, res) => {
     const payslips = await Payroll.find({
       employee: employee._id,
       status: "Paid", // Only show paid slips
-    }).sort({ year: -1, month: -1 });
+    })
+      .populate(
+        "employee",
+        "firstName lastName employeeId designation department bankDetails"
+      )
+      .sort({ year: -1, month: -1 });
 
     res.json({ payslips });
   } catch (error) {
