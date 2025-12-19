@@ -73,7 +73,6 @@ const clearanceSchema = new mongoose.Schema(
   }
 );
 
-clearanceSchema.index({ resignation: 1 });
 clearanceSchema.index({ employee: 1 });
 
 module.exports = mongoose.model("Clearance", clearanceSchema);

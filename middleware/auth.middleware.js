@@ -54,6 +54,11 @@ exports.authorize = (allowedRoles = []) => {
       normalizedAllowed.includes(userRole.toLowerCase())
     );
     if (allowedRoles.length && !hasMatchingRole) {
+      console.log("Access Denied Details:", {
+        userRoles,
+        normalizedAllowed,
+        userRolesLowercase: userRoles.map((r) => r.toLowerCase()),
+      });
       return res
         .status(403)
         .json({ message: "Access denied: Insufficient privileges" });

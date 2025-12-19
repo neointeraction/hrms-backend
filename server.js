@@ -121,11 +121,19 @@ const { initCron } = require("./jobs/email.cron");
 
 // Start Server
 if (require.main === module) {
-  app.listen(PORT, async () => {
-    console.log(`Server running on port ${PORT}`);
-    // Initialize Email Automation Cron
-    initCron();
-  });
+  // Connect to DB immediately on startup for background jobs
+  connectToDatabase()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+        // Initialize Email Automation Cron
+        initCron();
+      });
+    })
+    .catch((err) => {
+      console.error("Failed to connect to DB during startup:", err);
+      // Optional: process.exit(1) if critical
+    });
 }
 
 module.exports = app;

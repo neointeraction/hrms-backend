@@ -14,6 +14,9 @@ router.post("/structure", salaryController.upsertSalaryStructure);
 // Get Salary Structure (HR/Admin/Employee)
 router.get("/structure/:employeeId", salaryController.getSalaryStructure);
 
+// Get Payroll Stats (Accountant/Admin)
+router.get("/structure/stats/tenant", salaryController.getPayrollStats);
+
 // --- Payroll Processing Routes ---
 // Calculate Payroll (Accountant/Admin) - Returns draft
 router.post("/calculate", payrollController.calculatePayroll);

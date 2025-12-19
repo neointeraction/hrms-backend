@@ -1,5 +1,6 @@
 const SalaryStructure = require("../models/SalaryStructure");
 const Employee = require("../models/Employee");
+const mongoose = require("mongoose");
 
 // Create or Update Salary Structure
 exports.upsertSalaryStructure = async (req, res) => {
@@ -87,6 +88,32 @@ exports.getSalaryStructure = async (req, res) => {
     res.json({ structure });
   } catch (error) {
     console.error("Get salary structure error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+// Get Payroll Stats for Tenant
+exports.getPayrollStats = async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    // Aggregate total net salary for all active employees in the tenant
+    const stats = await SalaryStructure.aggregate([
+      { $match: { tenantId: new mongoose.Types.ObjectId(tenantId) } },
+      {
+        $group: {
+          _id: null,
+          totalNetSalary: { $sum: "$netSalary" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    res.json({
+      totalNetSalary: stats[0]?.totalNetSalary || 0,
+      employeeCount: stats[0]?.count || 0,
+    });
+  } catch (error) {
+    console.error("Get payroll stats error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
