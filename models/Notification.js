@@ -14,7 +14,16 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["LEAVE", "TIMESHEET", "PAYROLL", "SYSTEM", "MENTION", "REACTION"],
+      enum: [
+        "LEAVE",
+        "TIMESHEET",
+        "PAYROLL",
+        "SYSTEM",
+        "MENTION",
+        "REACTION",
+        "PROJECT",
+        "TASK",
+      ],
       required: true,
     },
     title: {

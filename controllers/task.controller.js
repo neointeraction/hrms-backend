@@ -1,4 +1,5 @@
 const Task = require("../models/Task");
+const Notification = require("../models/Notification");
 
 // Create Task
 exports.createTask = async (req, res) => {
@@ -34,6 +35,19 @@ exports.createTask = async (req, res) => {
     const task = new Task(taskData);
 
     await task.save();
+
+    // Notify Assignee
+    if (assignee && assignee.trim() !== "") {
+      await Notification.create({
+        recipient: assignee,
+        tenantId: req.user.tenantId,
+        type: "TASK",
+        title: "New Task Assigned",
+        message: `You have been assigned a new task: ${title}`,
+        relatedId: task._id,
+      });
+    }
+
     res.status(201).json({ message: "Task created successfully", task });
   } catch (error) {
     console.error("Create task error:", error);

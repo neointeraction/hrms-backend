@@ -1,0 +1,95 @@
+const Client = require("../models/Client");
+
+// Get all clients (Tenant Scoped)
+exports.getClients = async (req, res) => {
+  try {
+    const clients = await Client.find({ tenantId: req.user.tenantId }).sort({
+      createdAt: -1,
+    });
+    res.json(clients);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get single client
+exports.getClientById = async (req, res) => {
+  try {
+    const client = await Client.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+    });
+    if (!client) return res.status(404).json({ message: "Client not found" });
+    res.json(client);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Create new client
+exports.createClient = async (req, res) => {
+  try {
+    const { name, email, phone, address } = req.body;
+    const tenantId = req.user.tenantId;
+
+    // Check for existing client with same email in tenant
+    const existingClient = await Client.findOne({ email, tenantId });
+    if (existingClient) {
+      return res
+        .status(400)
+        .json({ message: "Client with this email already exists" });
+    }
+
+    const newClient = new Client({
+      name,
+      email,
+      phone,
+      address,
+      tenantId,
+    });
+
+    const savedClient = await newClient.save();
+    res.status(201).json(savedClient);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Update client
+exports.updateClient = async (req, res) => {
+  try {
+    const { name, email, phone, address, status } = req.body;
+
+    const updatedClient = await Client.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.user.tenantId },
+      { name, email, phone, address, status },
+      { new: true }
+    );
+
+    if (!updatedClient) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+
+    res.json(updatedClient);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Delete client
+exports.deleteClient = async (req, res) => {
+  try {
+    const deletedClient = await Client.findOneAndDelete({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+    });
+
+    if (!deletedClient) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+
+    res.json({ message: "Client deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

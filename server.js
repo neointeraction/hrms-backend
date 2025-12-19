@@ -84,6 +84,7 @@ app.use("/api/time-correction", timeCorrectionRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/leave", require("./routes/leave.routes"));
 app.use("/api/payroll", require("./routes/payroll.routes"));
+app.use("/api/dashboard", require("./routes/dashboard.routes"));
 app.use("/api/projects", require("./routes/project.routes"));
 app.use("/api/tasks", require("./routes/task.routes"));
 app.use("/api/holidays", require("./routes/holiday.routes"));
@@ -108,6 +109,7 @@ app.use("/api/social", require("./routes/social.routes"));
 app.use("/api/documents", require("./routes/document.routes"));
 app.use("/api/designations", require("./routes/designation.routes"));
 app.use("/api/shifts", require("./routes/shift.routes"));
+app.use("/api/clients", require("./routes/client.routes"));
 
 app.get("/", (req, res) => {
   res.send("HRM RBAC API is running");
