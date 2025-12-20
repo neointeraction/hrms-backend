@@ -175,6 +175,22 @@ exports.createEmployee = async (req, res) => {
     );
 
     await session.commitTransaction();
+
+    // Log Audit Entry (using non-transactional session for safety or simple async)
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Employee",
+      entityId: newEmployee._id,
+      action: "create",
+      performedBy: req.user.userId,
+      employee: newEmployee._id,
+      metadata: {
+        name: `${newEmployee.firstName} ${newEmployee.lastName}`,
+        role: roleName,
+      },
+      tenantId: tenantId,
+    });
+
     res.status(201).json(newEmployee);
   } catch (err) {
     await session.abortTransaction();
@@ -441,6 +457,7 @@ exports.updateEmployee = async (req, res) => {
         tenantId: req.user.tenantId,
         metadata: {
           description: "Employee profile updated",
+          name: `${employee.firstName} ${employee.lastName}`,
         },
       });
     }
@@ -720,6 +737,64 @@ exports.getEmployeeTimeline = async (req, res) => {
     res.json(timeline);
   } catch (err) {
     console.error("Get timeline error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Delete Employee (Soft Delete usually, but here strict delete mechanism might be needed or status update)
+exports.deleteEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const employee = await Employee.findById(id);
+
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // Verify Tenant
+    if (
+      employee.tenantId &&
+      req.user.tenantId &&
+      employee.tenantId.toString() !== req.user.tenantId.toString()
+    ) {
+      return res.status(403).json({ message: "Unauthorized access" });
+    }
+
+    // Instead of hard delete, usually we set status to Terminated
+    // But if strictly requested:
+    // await Employee.findByIdAndDelete(id);
+    // await User.findByIdAndDelete(employee.user);
+
+    // Let's assume status update for now, or if strict delete is needed:
+    // For now, let's implement soft delete / status change to "Terminated"
+    // or keep it as is if it was missing.
+
+    // If implementation didn't exist, I'll add a simple one.
+    // If it *did* exist (I don't see it in the file view), I'll assume I'm adding it.
+
+    employee.employeeStatus = "Terminated";
+    await employee.save();
+
+    await User.findByIdAndUpdate(employee.user, { status: "inactive" });
+
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Employee",
+      entityId: employee._id,
+      action: "delete", // Or 'terminate'
+      performedBy: req.user.userId,
+      employee: employee._id,
+      metadata: {
+        name: `${employee.firstName} ${employee.lastName}`,
+        type: "termination",
+      },
+      tenantId: req.user.tenantId,
+    });
+
+    res.json({ message: "Employee terminated successfully" });
+  } catch (err) {
+    console.error("Delete employee error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

@@ -113,6 +113,18 @@ exports.updateCompanySettings = async (req, res) => {
 
     await tenant.save();
 
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "CompanySettings",
+      entityId: tenant._id,
+      action: "update",
+      performedBy: req.user.userId,
+      changes: req.body, // Simplified
+      metadata: { companyName: tenant.companyName },
+      tenantId: req.user.tenantId,
+    });
+
     res.json({
       message: "Company settings updated successfully",
       company: {

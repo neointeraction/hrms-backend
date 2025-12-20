@@ -47,6 +47,18 @@ exports.createShift = async (req, res) => {
     });
 
     await newShift.save();
+
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Shift",
+      entityId: newShift._id,
+      action: "create",
+      performedBy: req.user.userId,
+      metadata: { name: newShift.name },
+      tenantId: req.user.tenantId,
+    });
+
     res.status(201).json(newShift);
   } catch (err) {
     console.error(err);
@@ -97,6 +109,18 @@ exports.updateShift = async (req, res) => {
       return res.status(404).json({ message: "Shift not found" });
     }
 
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Shift",
+      entityId: shift._id,
+      action: "update",
+      performedBy: req.user.userId,
+      changes: req.body, // Simplified
+      metadata: { name: shift.name },
+      tenantId: req.user.tenantId,
+    });
+
     res.json(shift);
   } catch (err) {
     console.error(err);
@@ -127,6 +151,17 @@ exports.deleteShift = async (req, res) => {
     if (!shift) {
       return res.status(404).json({ message: "Shift not found" });
     }
+
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Shift",
+      entityId: shift._id,
+      action: "delete",
+      performedBy: req.user.userId,
+      metadata: { name: shift.name },
+      tenantId: req.user.tenantId,
+    });
 
     res.json({ message: "Shift deleted successfully" });
   } catch (err) {

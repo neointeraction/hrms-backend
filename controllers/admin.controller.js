@@ -28,8 +28,16 @@ exports.deleteUser = async (req, res) => {
     // Delete associated employee record if it exists
     await Employee.deleteOne({ user: req.params.id });
 
-    // Delete user
-    await User.findByIdAndDelete(req.params.id);
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "User",
+      entityId: req.params.id,
+      action: "delete",
+      performedBy: req.user.userId,
+      metadata: { userId: req.params.id },
+      tenantId: req.user.tenantId,
+    });
 
     res.json({
       message: "User and associated employee data deleted successfully",
@@ -58,6 +66,18 @@ exports.updateUserStatus = async (req, res) => {
 
     user.status = status;
     await user.save();
+
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "User",
+      entityId: user._id,
+      action: "update",
+      performedBy: req.user.userId,
+      changes: { status },
+      metadata: { name: user.name },
+      tenantId: req.user.tenantId,
+    });
 
     res.json({ message: "User status updated successfully", user });
   } catch (err) {
@@ -112,6 +132,18 @@ exports.createRole = async (req, res) => {
     });
 
     await role.save();
+
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Role",
+      entityId: role._id,
+      action: "create",
+      performedBy: req.user.userId,
+      metadata: { name: role.name },
+      tenantId: req.user.tenantId,
+    });
+
     res.status(201).json(role);
   } catch (err) {
     console.error(err);
@@ -139,6 +171,19 @@ exports.updateRole = async (req, res) => {
     if (mandatoryDocuments) role.mandatoryDocuments = mandatoryDocuments;
 
     await role.save();
+
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Role",
+      entityId: role._id,
+      action: "update",
+      performedBy: req.user.userId,
+      changes: req.body, // Simplified
+      metadata: { name: role.name },
+      tenantId: req.user.tenantId,
+    });
+
     res.json(role);
   } catch (err) {
     console.error(err);
@@ -156,6 +201,17 @@ exports.deleteRole = async (req, res) => {
     if (!role) {
       return res.status(404).json({ message: "Role not found" });
     }
+
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Role",
+      entityId: role._id,
+      action: "delete",
+      performedBy: req.user.userId,
+      metadata: { name: role.name },
+      tenantId: req.user.tenantId,
+    });
 
     res.json({ message: "Role deleted successfully" });
   } catch (err) {

@@ -5,7 +5,18 @@ const auditLogSchema = new mongoose.Schema(
     entityType: {
       type: String,
       required: true,
-      enum: ["TimeEntry", "Timesheet", "TimeCorrection", "User", "Employee"],
+      enum: [
+        "TimeEntry",
+        "Timesheet",
+        "TimeCorrection",
+        "User",
+        "Employee",
+        "Project",
+        "Role",
+        "Shift",
+        "Payroll",
+        "CompanySettings",
+      ],
     },
     entityId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -23,6 +34,10 @@ const auditLogSchema = new mongoose.Schema(
         "submit",
         "login",
         "logout",
+        "generate",
+        "reset_password",
+        "approved",
+        "paid",
       ],
     },
     performedBy: {

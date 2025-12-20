@@ -126,6 +126,19 @@ exports.calculatePayroll = async (req, res) => {
     }
 
     await payroll.save();
+
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Payroll",
+      entityId: payroll._id,
+      action: "generate",
+      performedBy: req.user.userId,
+      employee: employeeId,
+      metadata: { month, year, netSalary },
+      tenantId,
+    });
+
     res.json({ message: "Payroll calculated successfully", payroll });
   } catch (error) {
     console.error("Calculate payroll error:", error);
@@ -188,6 +201,18 @@ exports.updatePayrollStatus = async (req, res) => {
         tenantId: req.user.tenantId, // Add tenantId
       });
     }
+
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Payroll",
+      entityId: payroll._id,
+      action: status.toLowerCase(),
+      performedBy: req.user.userId,
+      employee: payroll.employee?._id || payroll.employee, // Handle populated or ID
+      metadata: { month: payroll.month, year: payroll.year },
+      tenantId: req.user.tenantId,
+    });
 
     res.json({ message: `Payroll marked as ${status}`, payroll });
   } catch (error) {

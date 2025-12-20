@@ -46,6 +46,17 @@ exports.createProject = async (req, res) => {
       await Notification.insertMany(notifications);
     }
 
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Project",
+      entityId: project._id,
+      action: "create",
+      performedBy: req.user.userId,
+      metadata: { name: project.name },
+      tenantId: tenantId,
+    });
+
     res.status(201).json({ message: "Project created successfully", project });
   } catch (error) {
     console.error("Create project error:", error);
@@ -134,6 +145,13 @@ exports.updateProject = async (req, res) => {
       return res.status(400).json({ message: "No tenant context" });
     }
 
+    // 1. Fetch existing project to compare
+    const oldProject = await Project.findOne({ _id: req.params.id, tenantId });
+    if (!oldProject) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // 2. Perform Update
     const project = await Project.findOneAndUpdate(
       { _id: req.params.id, tenantId },
       req.body,
@@ -141,7 +159,56 @@ exports.updateProject = async (req, res) => {
         new: true,
       }
     );
-    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    // 3. Calculate Changes
+    const changes = {};
+    const fieldsToCheck = [
+      "name",
+      "description",
+      "status",
+      "startDate",
+      "endDate",
+      "budget",
+      "manager",
+    ];
+
+    fieldsToCheck.forEach((field) => {
+      if (
+        req.body[field] !== undefined &&
+        JSON.stringify(req.body[field]) !== JSON.stringify(oldProject[field])
+      ) {
+        changes[field] = {
+          from: oldProject[field],
+          to: req.body[field],
+        };
+      }
+    });
+
+    // Check members separately if needed, simplified for now
+    if (
+      req.body.members &&
+      JSON.stringify(req.body.members) !== JSON.stringify(oldProject.members)
+    ) {
+      changes.members = {
+        count_from: oldProject.members.length,
+        count_to: req.body.members.length,
+      };
+    }
+
+    // 4. Log Audit
+    if (Object.keys(changes).length > 0) {
+      const { createAuditLog } = require("../utils/auditLogger");
+      await createAuditLog({
+        entityType: "Project",
+        entityId: project._id,
+        action: "update",
+        performedBy: req.user.userId,
+        changes: changes,
+        metadata: { name: project.name },
+        tenantId: tenantId,
+      });
+    }
+
     res.json({ message: "Project updated", project });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -230,6 +297,17 @@ exports.deleteProject = async (req, res) => {
     });
 
     if (!project) return res.status(404).json({ message: "Project not found" });
+
+    // Log Audit
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "Project",
+      entityId: project._id,
+      action: "delete",
+      performedBy: req.user.userId,
+      metadata: { name: project.name },
+      tenantId: tenantId,
+    });
 
     res.json({ message: "Project deleted successfully" });
   } catch (error) {

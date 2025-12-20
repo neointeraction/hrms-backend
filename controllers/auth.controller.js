@@ -300,17 +300,48 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
+    const changes = {};
+
     // Update password if provided
     if (newPassword) {
       const salt = await bcrypt.genSalt(10);
       user.passwordHash = await bcrypt.hash(newPassword, salt);
+      changes.password = "changed";
     }
 
-    if (theme) {
-      user.theme = theme;
-    }
+    const allowedUpdates = [
+      "name",
+      "email",
+      "department",
+      "designation",
+      "pan",
+      "bankName",
+      "bankAccountNo",
+      "theme", // Include theme
+    ];
+
+    allowedUpdates.forEach((field) => {
+      if (req.body[field] !== undefined && user[field] !== req.body[field]) {
+        changes[field] = { from: user[field], to: req.body[field] };
+        user[field] = req.body[field];
+      }
+    });
 
     await user.save();
+
+    // Log Audit Entry
+    if (Object.keys(changes).length > 0) {
+      const { createAuditLog } = require("../utils/auditLogger");
+      await createAuditLog({
+        entityType: "User",
+        entityId: user._id,
+        action: "update",
+        performedBy: req.user.userId,
+        changes,
+        metadata: { name: user.name },
+        tenantId: user.tenantId,
+      });
+    }
 
     res.json({ message: "Profile updated successfully" });
   } catch (error) {
@@ -401,6 +432,18 @@ exports.resetPassword = async (req, res) => {
     user.resetPasswordExpires = undefined;
 
     await user.save();
+
+    // Log Audit Entry
+    const { createAuditLog } = require("../utils/auditLogger");
+    await createAuditLog({
+      entityType: "User",
+      entityId: user._id,
+      action: "reset_password",
+      performedBy: user._id, // User reset their own password
+      changes: { password: "reset" },
+      metadata: { name: user.name },
+      tenantId: user.tenantId,
+    });
 
     res.status(201).json({
       success: true,
