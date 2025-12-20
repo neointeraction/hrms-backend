@@ -103,15 +103,42 @@ exports.getAssets = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const [assets, total] = await Promise.all([
+    const [assetsData, total] = await Promise.all([
       Asset.find(query)
         .populate("categoryId", "name")
         .populate("createdBy", "name")
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(parseInt(limit))
+        .lean(),
       Asset.countDocuments(query),
     ]);
+
+    // Fetch active assignments for these assets
+    const AssetAssignment = require("../models/AssetAssignment");
+    const assetIds = assetsData.map((a) => a._id);
+    const assignments = await AssetAssignment.find({
+      assetId: { $in: assetIds },
+      status: { $in: ["Active", "Pending Acknowledgement"] },
+    }).populate("employeeId", "firstName lastName employeeId profilePicture");
+
+    // Map assignments to assets
+    const assignmentMap = {};
+    assignments.forEach((assignment) => {
+      if (assignment.employeeId) {
+        assignmentMap[assignment.assetId.toString()] = {
+          _id: assignment.employeeId._id,
+          name: `${assignment.employeeId.firstName} ${assignment.employeeId.lastName}`,
+          employeeId: assignment.employeeId.employeeId,
+          profilePicture: assignment.employeeId.profilePicture,
+        };
+      }
+    });
+
+    const assets = assetsData.map((asset) => ({
+      ...asset,
+      assignedTo: assignmentMap[asset._id.toString()] || null,
+    }));
 
     res.json({
       assets,

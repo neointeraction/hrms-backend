@@ -226,7 +226,14 @@ exports.getEmployeeAssets = async (req, res) => {
       tenantId: req.user.tenantId,
       status: { $in: ["Pending Acknowledgement", "Active"] },
     })
-      .populate("assetId")
+      .populate({
+        path: "assetId",
+        select: "name assetCode categoryId",
+        populate: {
+          path: "categoryId",
+          select: "name",
+        },
+      })
       .populate("issuedBy", "name")
       .sort({ issueDate: -1 });
 
@@ -244,7 +251,14 @@ exports.getPendingAcknowledgements = async (req, res) => {
       tenantId: req.user.tenantId,
       status: "Pending Acknowledgement",
     })
-      .populate("assetId", "name assetCode")
+      .populate({
+        path: "assetId",
+        select: "name assetCode categoryId",
+        populate: {
+          path: "categoryId",
+          select: "name",
+        },
+      })
       .populate("employeeId", "firstName lastName email")
       .populate("issuedBy", "name")
       .sort({ issueDate: -1 });
@@ -266,7 +280,14 @@ exports.getAssignments = async (req, res) => {
     if (employeeId) query.employeeId = employeeId;
 
     const assignments = await AssetAssignment.find(query)
-      .populate("assetId", "name assetCode")
+      .populate({
+        path: "assetId",
+        select: "name assetCode categoryId",
+        populate: {
+          path: "categoryId",
+          select: "name",
+        },
+      })
       .populate("employeeId", "firstName lastName email")
       .populate("issuedBy", "name")
       .sort({ issueDate: -1 });

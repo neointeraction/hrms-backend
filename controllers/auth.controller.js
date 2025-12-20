@@ -241,6 +241,7 @@ exports.getMe = async (req, res) => {
         employeeId: user.employeeId,
         department: user.department,
         designation: employee ? employee.designation : null,
+        employeeDbId: employee?._id,
         roles: user.roles, // Return full objects
         accessibleModules: (user.roles?.[0]?.accessibleModules || []).filter(
           (m) =>

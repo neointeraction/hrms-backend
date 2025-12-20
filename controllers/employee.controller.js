@@ -261,6 +261,11 @@ exports.getEmployeeById = async (req, res) => {
 // Update Employee
 exports.updateEmployee = async (req, res) => {
   try {
+    const existingEmployee = await Employee.findById(req.params.id);
+    if (!existingEmployee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
     // Clean data - remove empty strings for ObjectId and enum fields
     const cleanedData = { ...req.body };
 
@@ -399,6 +404,47 @@ exports.updateEmployee = async (req, res) => {
       }
     }
 
+    // Log Audit for Significant Changes
+    const AuditLog = require("../models/AuditLog");
+    const fieldsToTrack = [
+      "designation",
+      "role",
+      "department",
+      "employeeStatus",
+      "reportingManager",
+    ];
+    const changes = {};
+
+    fieldsToTrack.forEach((field) => {
+      // Compare string values roughly, or for ObjectId check stringified
+      const oldVal = existingEmployee[field]
+        ? existingEmployee[field].toString()
+        : null;
+      let newVal =
+        employee[field] !== undefined && employee[field] !== null
+          ? employee[field].toString()
+          : null;
+
+      if (oldVal !== newVal) {
+        changes[field] = { from: oldVal, to: newVal };
+      }
+    });
+
+    if (Object.keys(changes).length > 0) {
+      await AuditLog.create({
+        entityType: "Employee",
+        entityId: employee._id,
+        action: "update",
+        performedBy: req.user ? req.user.userId : employee.user, // Fallback if system update
+        employee: employee._id,
+        changes: changes,
+        tenantId: req.user.tenantId,
+        metadata: {
+          description: "Employee profile updated",
+        },
+      });
+    }
+
     res.json(employee);
   } catch (err) {
     console.error("Update Employee Error:", err);
@@ -532,6 +578,148 @@ exports.getUpcomingEvents = async (req, res) => {
     });
   } catch (err) {
     console.error("Get upcoming events error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get Employee Timeline
+exports.getEmployeeTimeline = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const employee = await Employee.findById(id);
+
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    const timeline = [];
+
+    // 1. Date of Joining
+    if (employee.dateOfJoining) {
+      timeline.push({
+        type: "Joined",
+        date: employee.dateOfJoining,
+        title: "Joined the Company",
+        description: `Started as ${employee.designation || "Employee"}`,
+        icon: "Rocket",
+      });
+
+      // 2. Probation Completion (Assuming 6 months for now, or fetch from settings)
+      const probationEndDate = new Date(employee.dateOfJoining);
+      probationEndDate.setMonth(probationEndDate.getMonth() + 6);
+
+      // Only show if date has passed or is today
+      // if (probationEndDate <= new Date()) {
+      timeline.push({
+        type: "Probation",
+        date: probationEndDate,
+        title: "Probation Completion",
+        description: "Successfully completed probation period",
+        icon: "CheckCircle",
+      });
+      // }
+
+      // 3. Work Anniversaries
+      const today = new Date();
+      const joinYear = new Date(employee.dateOfJoining).getFullYear();
+      const currentYear = today.getFullYear();
+
+      for (let year = joinYear + 1; year <= currentYear; year++) {
+        const anniversaryDate = new Date(employee.dateOfJoining);
+        anniversaryDate.setFullYear(year);
+
+        if (anniversaryDate <= today) {
+          const yearsCompleted = year - joinYear;
+          timeline.push({
+            type: "Anniversary",
+            date: anniversaryDate,
+            title: `${yearsCompleted} Year Work Anniversary`,
+            description: `Completed ${yearsCompleted} year${
+              yearsCompleted > 1 ? "s" : ""
+            } with us`,
+            icon: "Trophy",
+          });
+        }
+      }
+    }
+
+    // 4. Promotions / Role Changes from AuditLog
+    // Note: This relies on AuditLog being populated by updateEmployee calls
+    const AuditLog = require("../models/AuditLog");
+    const changes = await AuditLog.find({
+      entityType: "Employee",
+      entityId: employee._id,
+      action: "update",
+      $or: [
+        { "changes.designation": { $exists: true } },
+        { "changes.role": { $exists: true } },
+        { "changes.department": { $exists: true } },
+      ],
+    }).sort({ createdAt: 1 });
+
+    changes.forEach((log) => {
+      const chg = log.changes;
+      if (chg.designation) {
+        timeline.push({
+          type: "DesignationChange",
+          date: log.createdAt,
+          title: "Designation Updated",
+          description: `Changed from ${chg.designation.from} to ${chg.designation.to}`,
+          icon: "TrendingUp",
+        });
+      }
+      if (chg.role) {
+        timeline.push({
+          type: "RoleChange",
+          date: log.createdAt,
+          title: "Role Updated",
+          description: `Role changed from ${chg.role.from} to ${chg.role.to}`,
+          icon: "Shield",
+        });
+      }
+    });
+
+    // 5. Awards & Appreciations
+    const Appreciation = require("../models/Appreciation");
+    const appreciations = await Appreciation.find({
+      recipient: employee._id,
+    }).populate("badge sender");
+
+    appreciations.forEach((app) => {
+      timeline.push({
+        type: "Award",
+        date: app.createdAt,
+        title: `Received ${app.badge.title}`,
+        description: `Awarded by ${app.sender.firstName} ${app.sender.lastName}: "${app.message}"`,
+        icon: "Trophy",
+      });
+    });
+
+    // 6. Project Assignments
+    // Projects link to User, not Employee
+    if (employee.user) {
+      const Project = require("../models/Project");
+      const projects = await Project.find({
+        members: employee.user,
+      });
+
+      projects.forEach((proj) => {
+        timeline.push({
+          type: "Project",
+          date: proj.startDate || proj.createdAt,
+          title: `Joined Project: ${proj.name}`,
+          description: `Status: ${proj.status}`,
+          icon: "Rocket",
+        });
+      });
+    }
+
+    // Sort all events by date (newest first)
+    timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json(timeline);
+  } catch (err) {
+    console.error("Get timeline error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
