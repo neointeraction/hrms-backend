@@ -194,6 +194,7 @@ exports.login = async (req, res) => {
           !user.tenantId.limits.enabledModules ||
           user.tenantId.limits.enabledModules.includes(m)
       ),
+      theme: user.theme,
     };
 
     res.json({ token, user: responseUser });
@@ -270,6 +271,7 @@ exports.getMe = async (req, res) => {
         shiftId: employee?.shiftId || null, // Include shift information
         isSuperAdmin: user.isSuperAdmin || false,
         isCompanyAdmin: user.isCompanyAdmin || false,
+        theme: user.theme,
       },
       permissions: Array.from(permissions),
     });
@@ -283,7 +285,7 @@ exports.getMe = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword, theme } = req.body;
 
     const user = await User.findById(userId);
     if (!user) {
@@ -302,6 +304,10 @@ exports.updateProfile = async (req, res) => {
     if (newPassword) {
       const salt = await bcrypt.genSalt(10);
       user.passwordHash = await bcrypt.hash(newPassword, salt);
+    }
+
+    if (theme) {
+      user.theme = theme;
     }
 
     await user.save();

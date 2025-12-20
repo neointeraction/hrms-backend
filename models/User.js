@@ -42,6 +42,11 @@ const userSchema = new mongoose.Schema({
     enum: ["active", "inactive"],
     default: "active",
   },
+  theme: {
+    type: String,
+    enum: ["light", "dark"],
+    default: "light",
+  },
   roles: [
     {
       type: mongoose.Schema.Types.ObjectId,
