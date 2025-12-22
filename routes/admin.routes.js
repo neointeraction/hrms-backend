@@ -1,23 +1,54 @@
 const express = require("express");
 const router = express.Router();
 const adminController = require("../controllers/admin.controller");
-const { authenticateToken } = require("../middleware/auth.middleware");
+const {
+  authenticateToken,
+  authorizePermission,
+} = require("../middleware/auth.middleware");
 const { extractTenant } = require("../middleware/tenant.middleware");
 
 // Apply authentication and tenant middleware to all routes
 router.use(authenticateToken);
 router.use(extractTenant);
 
-// For now, public or just simple route to unblock 404
-router.get("/users", adminController.getUsers);
-router.delete("/users/:id", adminController.deleteUser);
-router.patch("/users/:id/status", adminController.updateUserStatus);
+// User Management (Protected by Employee permissions as they are linked)
+router.get(
+  "/users",
+  authorizePermission(["employees:view"]),
+  adminController.getUsers
+);
+router.delete(
+  "/users/:id",
+  authorizePermission(["employees:delete"]),
+  adminController.deleteUser
+);
+router.patch(
+  "/users/:id/status",
+  authorizePermission(["employees:edit"]),
+  adminController.updateUserStatus
+);
 
-// Role Routes
-router.get("/roles", adminController.getRoles);
-router.post("/roles", adminController.createRole);
-router.put("/roles/:id", adminController.updateRole);
-router.delete("/roles/:id", adminController.deleteRole);
-router.get("/permissions", adminController.getPermissions);
+// Role Routes (Protected by Role permissions)
+router.get(
+  "/roles",
+  authorizePermission(["roles:view"]),
+  adminController.getRoles
+);
+router.post(
+  "/roles",
+  authorizePermission(["roles:create"]),
+  adminController.createRole
+);
+router.put(
+  "/roles/:id",
+  authorizePermission(["roles:edit"]),
+  adminController.updateRole
+);
+router.delete(
+  "/roles/:id",
+  authorizePermission(["roles:delete"]),
+  adminController.deleteRole
+);
+router.get("/permissions", adminController.getPermissions); // Permissions list is public to authenticated users (or restrict to roles:view)
 
 module.exports = router;

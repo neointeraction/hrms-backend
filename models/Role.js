@@ -4,7 +4,6 @@ const roleSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    unique: true,
   },
   tenantId: {
     type: mongoose.Schema.Types.ObjectId,

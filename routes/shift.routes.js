@@ -3,34 +3,34 @@ const router = express.Router();
 const shiftController = require("../controllers/shift.controller");
 const {
   authenticateToken,
-  authorize,
+  authorizePermission,
 } = require("../middleware/auth.middleware");
 
 // All routes require authentication
 router.use(authenticateToken);
 
-// Management routes - Protected for Admin/HR
+// Management routes - Protected by permissions
 router.get(
   "/",
-  authorize(["Admin", "HR", "Super Admin"]),
+  authorizePermission(["shifts:view", "shifts:manage"]),
   shiftController.getShifts
 );
 
 router.post(
   "/",
-  authorize(["Admin", "HR", "Super Admin"]),
+  authorizePermission(["shifts:manage"]),
   shiftController.createShift
 );
 
 router.put(
   "/:id",
-  authorize(["Admin", "HR", "Super Admin"]),
+  authorizePermission(["shifts:manage"]),
   shiftController.updateShift
 );
 
 router.delete(
   "/:id",
-  authorize(["Admin", "HR", "Super Admin"]),
+  authorizePermission(["shifts:manage"]),
   shiftController.deleteShift
 );
 

@@ -18,6 +18,11 @@ exports.authenticateToken = (req, res, next) => {
 };
 
 exports.authorizePermission = (requiredPermissions) => {
+  // Normalize to array if string is passed
+  if (typeof requiredPermissions === "string") {
+    requiredPermissions = [requiredPermissions];
+  }
+
   return (req, res, next) => {
     if (!req.user || !req.user.permissions) {
       return res.status(403).json({ message: "Access denied" });

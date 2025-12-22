@@ -28,23 +28,48 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
+const { authorizePermission } = require("../middleware/auth.middleware");
+
 // Apply authentication and tenant middleware
 router.use(authMiddleware.authenticateToken);
 router.use(extractTenant);
 
 router.post(
   "/",
+  authorizePermission(["employees:create"]),
   upload.single("profilePicture"),
   employeeController.createEmployee
 );
-// Hierarchy route MUST be before /:id to avoid conflict if :id is generic (though here it is okay, better safe)
-router.get("/hierarchy", employeeController.getHierarchy);
-router.get("/upcoming-events", employeeController.getUpcomingEvents);
-router.get("/:id/timeline", employeeController.getEmployeeTimeline);
-router.get("/", employeeController.getEmployees);
-router.get("/:id", employeeController.getEmployeeById);
+// Hierarchy route MUST be before /:id (view permission usually enough)
+router.get(
+  "/hierarchy",
+  authorizePermission(["employees:view", "organization:view"]),
+  employeeController.getHierarchy
+);
+router.get(
+  "/upcoming-events",
+  authorizePermission(["employees:view"]),
+  employeeController.getUpcomingEvents
+);
+router.get(
+  "/:id/timeline",
+  authorizePermission(["employees:view"]),
+  employeeController.getEmployeeTimeline
+);
+router.get(
+  "/",
+  authorizePermission(["employees:view"]),
+  employeeController.getEmployees
+);
+router.get("/me", employeeController.getEmployeeProfile);
+router.get(
+  "/:id",
+  authorizePermission(["employees:view"]),
+  employeeController.getEmployeeById
+);
 router.put(
   "/:id",
+  authorizePermission(["employees:edit"]),
   upload.single("profilePicture"),
   employeeController.updateEmployee
 );

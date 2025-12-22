@@ -251,6 +251,31 @@ exports.getEmployees = async (req, res) => {
   }
 };
 
+// Get Current Employee Profile (Me)
+exports.getEmployeeProfile = async (req, res) => {
+  try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const employee = await Employee.findOne({
+      user: req.user.userId,
+      tenantId: req.user.tenantId,
+    })
+      .populate("user")
+      .populate("reportingManager", "firstName lastName")
+      .populate("shiftId", "name startTime endTime");
+
+    if (!employee) {
+      return res.status(404).json({ message: "Employee profile not found" });
+    }
+    res.json(employee);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Get single employee
 exports.getEmployeeById = async (req, res) => {
   try {

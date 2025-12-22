@@ -187,13 +187,19 @@ exports.login = async (req, res) => {
         : null,
       isSuperAdmin: user.isSuperAdmin,
       isCompanyAdmin: user.isCompanyAdmin,
-      accessibleModules: (user.roles?.[0]?.accessibleModules || []).filter(
-        (m) =>
-          !user.tenantId ||
-          !user.tenantId.limits ||
-          !user.tenantId.limits.enabledModules ||
-          user.tenantId.limits.enabledModules.includes(m)
-      ),
+      accessibleModules: [
+        ...new Set(
+          user.roles
+            ?.flatMap((r) => r.accessibleModules || [])
+            .filter(
+              (m) =>
+                !user.tenantId ||
+                !user.tenantId.limits ||
+                !user.tenantId.limits.enabledModules ||
+                user.tenantId.limits.enabledModules.includes(m)
+            )
+        ),
+      ],
       theme: user.theme,
     };
 
@@ -244,13 +250,29 @@ exports.getMe = async (req, res) => {
         designation: employee ? employee.designation : null,
         employeeDbId: employee?._id,
         roles: user.roles, // Return full objects
-        accessibleModules: (user.roles?.[0]?.accessibleModules || []).filter(
-          (m) =>
-            !user.tenantId ||
-            !user.tenantId.limits ||
-            !user.tenantId.limits.enabledModules ||
-            user.tenantId.limits.enabledModules.includes(m)
-        ), // Flatten for ease
+        accessibleModules: [
+          ...new Set(
+            user.roles
+              ?.flatMap((r) => {
+                console.log(
+                  `[DEBUG] Role ${r.name} modules:`,
+                  r.accessibleModules
+                );
+                return r.accessibleModules || [];
+              })
+              .filter((m) => {
+                const limits = user.tenantId?.limits;
+                const enabled = limits?.enabledModules;
+                const isAllowed = !limits || !enabled || enabled.includes(m);
+                if (!isAllowed)
+                  console.log(
+                    `[DEBUG] Module ${m} filtered out by tenant limits:`,
+                    enabled
+                  );
+                return isAllowed;
+              })
+          ),
+        ],
         avatar:
           employee && employee.profilePicture
             ? employee.profilePicture.startsWith("http")

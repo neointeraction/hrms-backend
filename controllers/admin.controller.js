@@ -96,9 +96,11 @@ exports.getRoles = async (req, res) => {
       return res.status(400).json({ message: "No tenant context" });
     }
 
-    const roles = await Role.find({ tenantId }).select(
-      "name description permissions accessibleModules mandatoryDocuments"
-    );
+    const roles = await Role.find({ tenantId })
+      .select(
+        "name description permissions accessibleModules mandatoryDocuments"
+      )
+      .populate("permissions");
     res.json(roles);
   } catch (err) {
     console.error(err);
@@ -156,6 +158,12 @@ exports.updateRole = async (req, res) => {
   try {
     const { name, permissions, accessibleModules, mandatoryDocuments } =
       req.body;
+
+    console.log("[DEBUG] updateRole payload:", {
+      id: req.params.id,
+      name,
+      accessibleModules,
+    });
     const role = await Role.findOne({
       _id: req.params.id,
       tenantId: req.user.tenantId,
