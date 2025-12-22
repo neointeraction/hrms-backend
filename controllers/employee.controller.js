@@ -634,6 +634,28 @@ exports.getEmployeeTimeline = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
+    // Verify Tenant Context
+    if (
+      !req.user.tenantId ||
+      (employee.tenantId &&
+        employee.tenantId.toString() !== req.user.tenantId.toString())
+    ) {
+      return res.status(403).json({ message: "Unauthorized tenant access" });
+    }
+
+    // Check Permissions:
+    // If user has "employees:view", they can view anyone.
+    // If not, they must own this employee profile (My Journey).
+    const hasViewAll = req.user.permissions?.includes("employees:view");
+    const isOwner =
+      employee.user && employee.user.toString() === req.user.userId;
+
+    if (!hasViewAll && !isOwner) {
+      return res
+        .status(403)
+        .json({ message: "Access denied: You can only view your own journey" });
+    }
+
     const timeline = [];
 
     // 1. Date of Joining

@@ -53,7 +53,7 @@ router.get(
 );
 router.get(
   "/:id/timeline",
-  authorizePermission(["employees:view"]),
+  authorizePermission(["employees:view", "my_journey:view"]),
   employeeController.getEmployeeTimeline
 );
 router.get(
