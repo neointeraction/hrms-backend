@@ -3,6 +3,8 @@ const TimeEntry = require("../models/TimeEntry");
 const Employee = require("../models/Employee");
 const { createAuditLog } = require("../utils/auditLogger");
 
+const Leave = require("../models/Leave");
+
 // Clock In
 exports.clockIn = async (req, res) => {
   try {
@@ -14,6 +16,26 @@ exports.clockIn = async (req, res) => {
       return res.status(404).json({
         message:
           "Employee profile not found. Please contact HR to create your employee profile before using attendance tracking.",
+      });
+    }
+
+    // Check for active approved leave
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const activeLeave = await Leave.findOne({
+      employee: employee._id,
+      status: "Approved",
+      startDate: { $lte: endOfDay },
+      endDate: { $gte: startOfDay },
+    });
+
+    if (activeLeave) {
+      return res.status(400).json({
+        message: "You cannot clock in while on approved leave.",
       });
     }
 

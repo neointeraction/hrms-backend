@@ -2,6 +2,8 @@ const Timesheet = require("../models/Timesheet");
 const Employee = require("../models/Employee");
 const { createAuditLog } = require("../utils/auditLogger");
 
+const Leave = require("../models/Leave");
+
 // Create Timesheet Entry
 exports.createEntry = async (req, res) => {
   try {
@@ -11,6 +13,27 @@ exports.createEntry = async (req, res) => {
     const employee = await Employee.findOne({ user: userId });
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // Check for approved leave on the entry date
+    const entryDateObj = new Date(date);
+    const startOfDay = new Date(entryDateObj);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(entryDateObj);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const activeLeave = await Leave.findOne({
+      employee: employee._id,
+      status: "Approved",
+      startDate: { $lte: endOfDay },
+      endDate: { $gte: startOfDay },
+    });
+
+    if (activeLeave) {
+      return res.status(400).json({
+        message:
+          "Cannot create timesheet entry for a day marked as approved leave.",
+      });
     }
 
     // Calculate week ending date (Sunday)
