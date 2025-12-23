@@ -2,6 +2,8 @@ const Tenant = require("../models/Tenant");
 const User = require("../models/User");
 const Role = require("../models/Role");
 const Employee = require("../models/Employee"); // Import Employee for cascading delete
+const Permission = require("../models/Permission");
+const roleTemplates = require("../config/roleTemplates");
 const bcrypt = require("bcryptjs");
 
 // Get All Tenants
@@ -240,99 +242,35 @@ exports.createTenant = async (req, res) => {
     });
     await tenant.save();
 
-    // Seed default roles for this tenant
-    const defaultRoles = [
-      { name: "Admin", description: "Administrator with full access" },
-      { name: "HR", description: "HR Manager" },
-      { name: "Project Manager", description: "Project Manager" },
-      { name: "Employee", description: "Standard Employee" },
-      { name: "Intern", description: "Intern" },
-      { name: "Consultant", description: "Consultant" },
-      { name: "Accountant", description: "Accountant" },
-    ];
-
-    // Role Templates (based on Neointeraction tenant)
-    const roleTemplates = {
-      Admin: null, // Null means ALL enabled modules
-      Accountant: ["payroll"],
-      Consultant: [
-        "assets",
-        "leave",
-        "attendance",
-        "payroll",
-        "projects",
-        "organization",
-        "timesheet",
-      ],
-      Employee: [
-        "assets",
-        "audit",
-        "leave",
-        "attendance",
-        "payroll",
-        "projects",
-        "organization",
-        "feedback",
-        "social",
-        "tasks",
-        "timesheet",
-      ],
-      HR: [
-        "employees",
-        "assets",
-        "ai_chatbot",
-        "audit",
-        "leave",
-        "attendance",
-        "payroll",
-        "organization",
-        "feedback",
-        "social",
-        "email_automation",
-        "timesheet",
-        "policies",
-      ],
-      Intern: [
-        "assets",
-        "leave",
-        "attendance",
-        "payroll",
-        "projects",
-        "organization",
-        "feedback",
-        "social",
-        "timesheet",
-      ],
-      "Project Manager": [
-        "assets",
-        "leave",
-        "attendance",
-        "payroll",
-        "projects",
-        "organization",
-        "feedback",
-        "social",
-        "tasks",
-        "timesheet",
-      ],
-    };
-
+    // Seed default roles for this tenant using templates
     const createdRoles = [];
-    for (const roleData of defaultRoles) {
-      const templateModules = roleTemplates[roleData.name];
 
-      // If template exists, intersect with enabled modules. If null (Admin), use all enabled modules.
-      let accessibleModules = limits.enabledModules;
-      if (templateModules) {
-        accessibleModules = templateModules.filter((m) =>
-          limits.enabledModules.includes(m)
-        );
-      }
+    // Pre-fetch all permissions to map names to IDs
+    const allPermissions = await Permission.find({});
+    const permissionMap = new Map(allPermissions.map((p) => [p.name, p._id]));
+
+    for (const [roleName, template] of Object.entries(roleTemplates)) {
+      // Filter modules based on tenant plan & limits
+      // If template has specific modules, intersect.
+      // Admin usually gets ALL enabled modules, but template defines specific list.
+      // Let's union Admin's template list with enabledModules?
+      // Or strictly follow template intersected with enabledModules.
+      // The user wants "default state" to match template.
+
+      let accessibleModules = template.modules.filter((m) =>
+        limits.enabledModules.includes(m)
+      );
+
+      // Map permission names to IDs
+      const rolePermissions = template.permissions
+        .map((pName) => permissionMap.get(pName))
+        .filter((id) => id); // Filter out undefined if permission not found in DB
 
       const role = new Role({
-        ...roleData,
+        name: roleName,
+        description: template.description,
         tenantId: tenant._id,
-        permissions: [],
+        permissions: rolePermissions,
         accessibleModules,
       });
       await role.save();

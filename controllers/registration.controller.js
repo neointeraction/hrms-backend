@@ -1,6 +1,8 @@
 const Tenant = require("../models/Tenant");
 const User = require("../models/User");
 const Role = require("../models/Role");
+const Permission = require("../models/Permission");
+const roleTemplates = require("../config/roleTemplates");
 const bcrypt = require("bcryptjs");
 
 /**
@@ -117,22 +119,29 @@ exports.registerCompany = async (req, res) => {
     await tenant.save();
 
     // Create default roles for this tenant
-    const defaultRoles = [
-      { name: "Admin", description: "Administrator with full access" },
-      { name: "HR", description: "HR Manager" },
-      { name: "Project Manager", description: "Project Manager" },
-      { name: "Employee", description: "Standard Employee" },
-      { name: "Accountant", description: "Accountant" },
-      { name: "Intern", description: "Intern" },
-      { name: "Consultant", description: "Consultant" },
-    ];
-
     const createdRoles = [];
-    for (const roleData of defaultRoles) {
+
+    // Pre-fetch permissions
+    const allPermissions = await Permission.find({});
+    const permissionMap = new Map(allPermissions.map((p) => [p.name, p._id]));
+
+    for (const [roleName, template] of Object.entries(roleTemplates)) {
+      // Filter modules based on plan limits
+      let accessibleModules = template.modules.filter((m) =>
+        limits.enabledModules.includes(m)
+      );
+
+      // Map permissions
+      const rolePermissions = template.permissions
+        .map((pName) => permissionMap.get(pName))
+        .filter((id) => id);
+
       const role = new Role({
-        ...roleData,
+        name: roleName,
+        description: template.description,
         tenantId: tenant._id,
-        permissions: [],
+        permissions: rolePermissions,
+        accessibleModules,
       });
       await role.save();
       createdRoles.push(role);
