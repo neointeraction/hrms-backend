@@ -159,6 +159,7 @@ module.exports = {
       "projects:task_delete",
       "projects:task_create",
       "my_journey:view",
+      "organization:view",
     ],
   },
   HR: {
@@ -215,6 +216,7 @@ module.exports = {
       "payroll:manage_structure",
       "payroll:view_payslips",
       "payroll:view",
+      "organization:view",
     ],
   },
   Intern: {
@@ -230,7 +232,7 @@ module.exports = {
       "documents",
       "my_journey",
     ],
-    permissions: ["my_journey:view", "assets:view"],
+    permissions: ["my_journey:view", "assets:view", "organization:view"],
   },
   "Project Manager": {
     name: "Project Manager",
@@ -269,6 +271,7 @@ module.exports = {
       "leave:approve",
       "leave:manage_balances",
       "leave:view_all",
+      "organization:view",
     ],
   },
 };

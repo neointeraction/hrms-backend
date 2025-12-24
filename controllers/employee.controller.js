@@ -522,6 +522,56 @@ exports.getHierarchy = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// Get Employee Directory (Safe public info)
+exports.getDirectory = async (req, res) => {
+  try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const employees = await Employee.find(
+      { tenantId: req.user.tenantId },
+      // Select ONLY safe fields
+      {
+        firstName: 1,
+        lastName: 1,
+        designation: 1,
+        department: 1,
+        email: 1,
+        workPhone: 1,
+        personalMobile: 1,
+        profilePicture: 1,
+        reportingManager: 1,
+        isOnline: 1, // Note: this is calculated below if needed, but schema doesn't have it persistent usually
+        role: 1,
+      }
+    )
+      .populate("reportingManager", "firstName lastName")
+      .lean();
+
+    // Fetch active time entries for online status
+    const TimeEntry = require("../models/TimeEntry");
+    const activeEntries = await TimeEntry.find({
+      tenantId: req.user.tenantId,
+      status: "active",
+    }).select("employee");
+
+    const activeEmployeeIds = new Set(
+      activeEntries.map((entry) => entry.employee.toString())
+    );
+
+    const directory = employees.map((emp) => ({
+      ...emp,
+      isOnline: activeEmployeeIds.has(emp._id.toString()),
+    }));
+
+    res.json(directory);
+  } catch (err) {
+    console.error("Get directory error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 // Get Upcoming Birthdays and Work Anniversaries
 exports.getUpcomingEvents = async (req, res) => {
   try {

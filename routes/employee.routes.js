@@ -46,6 +46,13 @@ router.get(
   authorizePermission(["employees:view", "organization:view"]),
   employeeController.getHierarchy
 );
+
+// Search/Directory route (Safe for all employees)
+router.get(
+  "/directory",
+  authorizePermission(["employees:view", "organization:view"]),
+  employeeController.getDirectory
+);
 router.get(
   "/upcoming-events",
   authorizePermission(["employees:view"]),
