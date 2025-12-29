@@ -116,6 +116,7 @@ app.get("/", (req, res) => {
 });
 
 const { initCron } = require("./jobs/email.cron");
+const { initTrialCron } = require("./jobs/trial.cron");
 
 // ... (existing helper function if needed, or just imports)
 
@@ -128,6 +129,8 @@ if (require.main === module) {
         console.log(`Server running on port ${PORT}`);
         // Initialize Email Automation Cron
         initCron();
+        // Initialize Trial Expiration Cron
+        initTrialCron();
       });
     })
     .catch((err) => {

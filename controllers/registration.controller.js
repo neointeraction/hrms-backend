@@ -113,8 +113,8 @@ exports.registerCompany = async (req, res) => {
       subscriptionStart: new Date(),
       subscriptionEnd:
         plan !== "free"
-          ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-          : undefined, // 30 days trial for paid plans
+          ? new Date(Date.now() + 1 * 24 * 60 * 60 * 1000)
+          : undefined, // 1 day trial for paid plans (Temporary)
     });
     await tenant.save();
 

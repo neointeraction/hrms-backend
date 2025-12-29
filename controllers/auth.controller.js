@@ -88,10 +88,13 @@ exports.login = async (req, res) => {
 
     // Check if tenant is active (skip for Super Admin)
     if (user.tenantId && !user.isSuperAdmin) {
-      if (user.tenantId.status === "suspended") {
+      if (
+        user.tenantId.status === "suspended" ||
+        user.tenantId.status === "expired"
+      ) {
         return res.status(403).json({
           message:
-            "Your company account has been suspended. Please contact support.",
+            "Your company account has been deactivated. Please contact support.",
         });
       }
     }
