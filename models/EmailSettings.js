@@ -41,6 +41,20 @@ const EmailSettingsSchema = new mongoose.Schema(
       notifyHR: { type: Boolean, default: false },
       notifyAllEmployees: { type: Boolean, default: false }, // Send celebration email to all employees
     },
+    timesheetReminder: {
+      enabled: { type: Boolean, default: false },
+      subject: {
+        type: String,
+        default: "Reminder: Update Your Timesheet",
+      },
+      body: {
+        type: String,
+        default:
+          "Dear {{employee_name}},\n\nThis is a friendly reminder to update your timesheet for the current week.\n\nPlease log your hours at your earliest convenience.\n\nBest regards,\n{{company_name}}",
+      },
+      dayOfWeek: { type: Number, default: 5, min: 0, max: 6 }, // 0=Sunday, 6=Saturday, default Friday
+      time: { type: String, default: "09:00" }, // 24-hour format HH:mm
+    },
   },
   { timestamps: true }
 );

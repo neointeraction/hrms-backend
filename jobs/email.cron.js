@@ -252,6 +252,90 @@ const processEmailAutomation = async (tenantId = null) => {
           }
         }
       }
+
+      // --- Timesheet Reminder Logic ---
+      if (settings.timesheetReminder?.enabled) {
+        const Timesheet = require("../models/Timesheet");
+
+        // Calculate current week ending date (Sunday)
+        const dayOfWeek = today.getDay();
+        const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+        const currentWeekEnding = new Date(today);
+        currentWeekEnding.setDate(today.getDate() + daysUntilSunday);
+        currentWeekEnding.setHours(0, 0, 0, 0);
+
+        // Get all active employees for this tenant
+        const allActiveEmployees = await Employee.find({
+          tenantId: settings.tenantId._id,
+          employeeStatus: "Active",
+          email: { $exists: true, $ne: null, $ne: "" },
+        });
+
+        for (const emp of allActiveEmployees) {
+          // Check if employee has any timesheet entries for current week
+          const timesheetEntries = await Timesheet.find({
+            employee: emp._id,
+            weekEnding: currentWeekEnding,
+          });
+
+          // If no entries or all entries are in draft status, send reminder
+          if (
+            timesheetEntries.length === 0 ||
+            timesheetEntries.every((t) => t.status === "draft")
+          ) {
+            // Check if already sent reminder today to avoid dupes
+            const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+            const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+            const alreadySent = await EmailAudit.findOne({
+              "recipient.employeeId": emp._id,
+              type: "TimesheetReminder",
+              sentAt: { $gte: startOfDay, $lte: endOfDay },
+              status: "Success",
+            });
+
+            if (alreadySent && !tenantId) continue; // Skip if auto-run and already sent
+
+            const subject = settings.timesheetReminder.subject.replace(
+              /{{employee_name}}/g,
+              emp.firstName
+            );
+            const body = populateTemplate(
+              settings.timesheetReminder.body,
+              emp,
+              0,
+              companyName
+            );
+
+            // Send Email
+            const result = await emailService.sendEmail({
+              to: emp.email,
+              subject: subject,
+              html: body,
+            });
+
+            // Log Audit
+            await EmailAudit.create({
+              tenantId: settings.tenantId._id,
+              recipient: {
+                name: `${emp.firstName} ${emp.lastName}`,
+                email: emp.email,
+                employeeId: emp._id,
+              },
+              type: "TimesheetReminder",
+              subject: subject,
+              bodySnapshot: body,
+              status: result.success ? "Success" : "Failed",
+              error: result.error,
+              triggeredBy: tenantId ? "HR Manual" : "System",
+            });
+
+            console.log(
+              `Sent timesheet reminder to ${emp.firstName} ${emp.lastName}`
+            );
+          }
+        }
+      }
     }
   } catch (error) {
     console.error("Email Automation Job Failed:", error);
@@ -271,18 +355,35 @@ const initCron = () => {
   cron.schedule("0 * * * *", async () => {
     const now = new Date();
     const currentHour = String(now.getHours()).padStart(2, "0");
-    const currentMinute = "00";
-    // Find settings where schedule.time starts with currentHour
-    // Actually, let's just run it and filter inside or rely on manual for now?
-    // Let's do: Run hourly, check if `schedule.time` matches roughly current hour.
+    const currentDayOfWeek = now.getDay(); // 0=Sunday, 6=Saturday
 
-    // Fetch all settings enabled
+    // Fetch all settings with birthday/anniversary enabled
     const allSettings = await EmailSettings.find({ "schedule.enabled": true });
     for (const settings of allSettings) {
       const [h, m] = (settings.schedule.time || "09:00").split(":");
       if (parseInt(h) === now.getHours()) {
         console.log(
-          `Triggering automation for tenant ${settings.tenantId} at ${h}:${m}`
+          `Triggering birthday/anniversary automation for tenant ${settings.tenantId} at ${h}:${m}`
+        );
+        await processEmailAutomation(settings.tenantId);
+      }
+    }
+
+    // Fetch all settings with timesheet reminders enabled
+    const timesheetSettings = await EmailSettings.find({
+      "timesheetReminder.enabled": true,
+    });
+    for (const settings of timesheetSettings) {
+      const [h, m] = (settings.timesheetReminder.time || "09:00").split(":");
+      const configuredDay = settings.timesheetReminder.dayOfWeek || 5; // Default Friday
+
+      // Check if current day and hour match the configured schedule
+      if (
+        parseInt(h) === now.getHours() &&
+        currentDayOfWeek === configuredDay
+      ) {
+        console.log(
+          `Triggering timesheet reminder for tenant ${settings.tenantId} at ${h}:${m} on day ${configuredDay}`
         );
         await processEmailAutomation(settings.tenantId);
       }

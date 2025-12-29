@@ -17,7 +17,7 @@ const EmailAuditSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["Birthday", "Anniversary"],
+      enum: ["Birthday", "Anniversary", "TimesheetReminder"],
       required: true,
     },
     subject: { type: String, required: true },
