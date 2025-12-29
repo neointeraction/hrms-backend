@@ -1,6 +1,8 @@
 const Resignation = require("../models/Resignation");
 const Employee = require("../models/Employee");
 const User = require("../models/User");
+const Clearance = require("../models/Clearance");
+const AssetAssignment = require("../models/AssetAssignment");
 
 // Submit Resignation
 exports.submitResignation = async (req, res) => {
@@ -132,6 +134,58 @@ exports.updateResignationStatus = async (req, res) => {
     });
 
     await resignation.save();
+
+    // Automation: Create Clearance details if Approved
+    if (status === "Approved") {
+      const existingClearance = await Clearance.findOne({ resignation: id });
+      if (!existingClearance) {
+        // Fetch Assigned Assets
+        const assignedAssets = await AssetAssignment.find({
+          employeeId: resignation.employee,
+          status: { $in: ["Active", "Pending Acknowledgement"] },
+        }).populate("assetId");
+
+        const assetsToReturn = assignedAssets.map((assignment) => ({
+          assetAssignment: assignment._id,
+          assetName: assignment.assetId
+            ? assignment.assetId.name
+            : "Unknown Asset",
+          assetCode: assignment.assetId ? assignment.assetId.assetCode : "N/A",
+          status: "Pending",
+        }));
+
+        // Default Checklist
+        const checklist = [
+          {
+            task: "Revoke Systems Access",
+            department: "IT",
+            status: "Pending",
+          },
+          {
+            task: "Email Account Deactivation",
+            department: "IT",
+            status: "Pending",
+          },
+          { task: "ID Card Return", department: "Admin", status: "Pending" },
+          {
+            task: "Full & Final Settlement",
+            department: "Finance",
+            status: "Pending",
+          },
+          { task: "Exit Interview", department: "HR", status: "Pending" },
+        ];
+
+        await Clearance.create({
+          resignation: id,
+          employee: resignation.employee,
+          tenantId: resignation.tenantId,
+          assetsToReturn,
+          checklist,
+          createdBy: userId,
+        });
+        console.log(`Auto-generated Clearance for Resignation ${id}`);
+      }
+    }
 
     res.json({ message: "Resignation updated successfully", resignation });
   } catch (error) {

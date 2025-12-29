@@ -55,6 +55,18 @@ const EmailSettingsSchema = new mongoose.Schema(
       dayOfWeek: { type: Number, default: 5, min: 0, max: 6 }, // 0=Sunday, 6=Saturday, default Friday
       time: { type: String, default: "09:00" }, // 24-hour format HH:mm
     },
+    holidayReminder: {
+      enabled: { type: Boolean, default: false },
+      subject: {
+        type: String,
+        default: "Upcoming Holiday: {{holiday_name}}",
+      },
+      body: {
+        type: String,
+        default:
+          "Dear Team,\n\nThis is a reminder that our office will be closed on {{holiday_date}} ({{holiday_day}}) for {{holiday_name}}.\n\nEnjoy the break!\n\nBest regards,\n{{company_name}}",
+      },
+    },
   },
   { timestamps: true }
 );

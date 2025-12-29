@@ -336,6 +336,100 @@ const processEmailAutomation = async (tenantId = null) => {
           }
         }
       }
+
+      // --- Holiday Reminder Logic ---
+      if (settings.holidayReminder?.enabled) {
+        const Holiday = require("../models/Holiday");
+
+        // Target Date: Today + 2 Days
+        const targetDate = new Date(today);
+        targetDate.setDate(today.getDate() + 2);
+
+        const tMonth = targetDate.getMonth() + 1;
+        const tDay = targetDate.getDate();
+        const tYear = targetDate.getFullYear();
+
+        const upcomingHoliday = await Holiday.findOne({
+          tenantId: settings.tenantId._id,
+          $expr: {
+            $and: [
+              { $eq: [{ $month: "$date" }, tMonth] },
+              { $eq: [{ $dayOfMonth: "$date" }, tDay] },
+              { $eq: [{ $year: "$date" }, tYear] },
+            ],
+          },
+        });
+
+        if (upcomingHoliday) {
+          const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+          const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+          const alreadySent = await EmailAudit.findOne({
+            tenantId: settings.tenantId._id,
+            type: "HolidayReminder",
+            relatedId: upcomingHoliday._id,
+            sentAt: { $gte: startOfDay, $lte: endOfDay },
+            status: "Success",
+          });
+
+          if (!alreadySent || tenantId) {
+            const allEmployees = await Employee.find({
+              tenantId: settings.tenantId._id,
+              employeeStatus: "Active",
+              email: { $exists: true, $ne: null, $ne: "" },
+            });
+
+            const formattedDate = new Date(
+              upcomingHoliday.date
+            ).toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            });
+
+            const subject = settings.holidayReminder.subject.replace(
+              /{{holiday_name}}/g,
+              upcomingHoliday.name
+            );
+            let bodyTemplate = settings.holidayReminder.body
+              .replace(/{{holiday_name}}/g, upcomingHoliday.name)
+              .replace(/{{holiday_date}}/g, formattedDate)
+              .replace(/{{holiday_day}}/g, upcomingHoliday.day || "")
+              .replace(/{{company_name}}/g, companyName);
+
+            console.log(
+              `Sending Holiday Reminder for ${upcomingHoliday.name} to ${allEmployees.length} employees`
+            );
+
+            for (const emp of allEmployees) {
+              const body = bodyTemplate.replace(
+                /{{employee_name}}/g,
+                emp.firstName
+              );
+              await emailService.sendEmail({
+                to: emp.email,
+                subject: subject,
+                html: body,
+              });
+            }
+
+            await EmailAudit.create({
+              tenantId: settings.tenantId._id,
+              recipient: {
+                name: "System Broadcast",
+                email: "all@system",
+                employeeId: null,
+              },
+              type: "HolidayReminder",
+              subject: subject,
+              bodySnapshot: bodyTemplate,
+              status: "Success",
+              relatedId: upcomingHoliday._id,
+              triggeredBy: tenantId ? "Manual" : "System",
+            });
+          }
+        }
+      }
     }
   } catch (error) {
     console.error("Email Automation Job Failed:", error);

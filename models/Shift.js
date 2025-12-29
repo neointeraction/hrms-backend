@@ -27,6 +27,11 @@ const shiftSchema = new mongoose.Schema(
       type: [String], // Array of days, e.g., ["Monday", "Tuesday", ...]
       default: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
     },
+    saturdayPolicy: {
+      type: String,
+      enum: ["all", "odd", "even"], // all: All Saturdays, odd: 1st, 3rd, 5th, even: 2nd, 4th
+      default: "all",
+    },
     status: {
       type: String,
       enum: ["active", "inactive"],

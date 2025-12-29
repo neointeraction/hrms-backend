@@ -218,6 +218,7 @@ module.exports = {
       "payroll:view_payslips",
       "payroll:view",
       "organization:view",
+      "roles:view",
     ],
   },
   Intern: {

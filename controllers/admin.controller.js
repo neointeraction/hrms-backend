@@ -96,7 +96,9 @@ exports.getRoles = async (req, res) => {
       return res.status(400).json({ message: "No tenant context" });
     }
 
-    const roles = await Role.find({ tenantId })
+    const roles = await Role.find({
+      $or: [{ tenantId }, { tenantId: null }, { tenantId: { $exists: false } }],
+    })
       .select(
         "name description permissions accessibleModules mandatoryDocuments"
       )
