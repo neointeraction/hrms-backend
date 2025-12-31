@@ -82,6 +82,23 @@ exports.registerCompany = async (req, res) => {
           "projects",
           "tasks",
           "timesheet",
+          "policies",
+          "documents",
+          "email_automation",
+          "social",
+          "ai_chatbot",
+          "appreciation",
+          "shifts",
+          "my_journey",
+          "designations",
+          "exit_management",
+          "clients",
+          "help",
+          "assets",
+          "organization",
+          "feedback",
+          "audit",
+          "roles",
         ],
       },
       enterprise: {
@@ -113,8 +130,8 @@ exports.registerCompany = async (req, res) => {
       subscriptionStart: new Date(),
       subscriptionEnd:
         plan !== "free"
-          ? new Date(Date.now() + 1 * 24 * 60 * 60 * 1000)
-          : undefined, // 1 day trial for paid plans (Temporary)
+          ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+          : undefined, // 14 days trial for paid plans
     });
     await tenant.save();
 

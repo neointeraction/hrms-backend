@@ -186,6 +186,7 @@ exports.login = async (req, res) => {
             status: user.tenantId.status,
             limits: user.tenantId.limits,
             settings: user.tenantId.settings, // Include settings
+            subscriptionEnd: user.tenantId.subscriptionEnd, // Include subscriptionEnd
           }
         : null,
       isSuperAdmin: user.isSuperAdmin,
@@ -219,7 +220,10 @@ exports.getMe = async (req, res) => {
     const user = await User.findById(req.user.userId)
       .select("-passwordHash")
       .populate("roles")
-      .populate("tenantId", "companyName status limits settings"); // Populate tenant details with limits and settings
+      .populate(
+        "tenantId",
+        "companyName status limits settings subscriptionEnd"
+      ); // Populate tenant details with limits and settings
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -291,6 +295,7 @@ exports.getMe = async (req, res) => {
               status: user.tenantId.status,
               limits: user.tenantId.limits,
               settings: user.tenantId.settings, // Include settings
+              subscriptionEnd: user.tenantId.subscriptionEnd, // Include subscriptionEnd
             }
           : null,
         shiftId: employee?.shiftId || null, // Include shift information

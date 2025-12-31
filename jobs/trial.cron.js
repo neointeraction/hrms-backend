@@ -6,13 +6,12 @@ const initTrialCron = () => {
   cron.schedule("0 0 * * *", async () => {
     console.log("Running Daily Trial Expiration Check...");
     try {
-      const oneDayAgo = new Date();
-      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+      const now = new Date();
 
-      // Find tenants that are in 'trial' status and started more than 1 day ago
+      // Find tenants that are in 'trial' status and have passed their subscription end date
       const expiredTenants = await Tenant.find({
         status: "trial",
-        subscriptionStart: { $lte: oneDayAgo },
+        subscriptionEnd: { $lte: now },
       });
 
       if (expiredTenants.length === 0) {
@@ -25,7 +24,7 @@ const initTrialCron = () => {
       );
 
       for (const tenant of expiredTenants) {
-        tenant.status = "expired";
+        tenant.status = "suspended";
         await tenant.save();
         console.log(
           `Tenant ${tenant.companyName} (${tenant._id}) marked as expired.`

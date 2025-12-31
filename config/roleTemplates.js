@@ -2,7 +2,7 @@
 module.exports = {
   Accountant: {
     name: "Accountant",
-    description: "Accountant",
+    description: "Default Accountant role",
     modules: ["payroll", "organization", "my_journey"],
     permissions: [
       "payroll:view_payslips",
@@ -15,7 +15,7 @@ module.exports = {
   },
   Admin: {
     name: "Admin",
-    description: "Admin",
+    description: "Default Admin role",
     modules: [
       "employees",
       "roles",
@@ -106,13 +106,13 @@ module.exports = {
   },
   CEO: {
     name: "CEO",
-    description: "CEO",
+    description: "Default CEO role",
     modules: ["social"],
     permissions: [],
   },
   Consultant: {
     name: "Consultant",
-    description: "Consultant",
+    description: "Default Consultant role",
     modules: [
       "leave",
       "projects",
@@ -134,13 +134,11 @@ module.exports = {
   },
   Employee: {
     name: "Employee",
-    description: "Employee",
+    description: "Default Employee role",
     modules: [
-      "assets",
       "leave",
       "feedback",
       "timesheet",
-      "documents",
       "payroll",
       "social",
       "attendance",
@@ -165,7 +163,7 @@ module.exports = {
   },
   HR: {
     name: "HR",
-    description: "HR",
+    description: "Default HR role",
     modules: [
       "employees",
       "assets",
@@ -187,6 +185,7 @@ module.exports = {
       "exit_management",
       "clients",
       "help",
+      "roles",
     ],
     permissions: [
       "designations:view",
@@ -223,7 +222,7 @@ module.exports = {
   },
   Intern: {
     name: "Intern",
-    description: "Intern",
+    description: "Default Intern role",
     modules: [
       "leave",
       "projects",
@@ -257,7 +256,7 @@ module.exports = {
   },
   "Project Manager": {
     name: "Project Manager",
-    description: "Project Manager",
+    description: "Default Project Manager role",
     modules: [
       "attendance",
       "payroll",
@@ -266,7 +265,6 @@ module.exports = {
       "feedback",
       "social",
       "email_automation",
-      "timesheet",
       "timesheet",
       "policies",
       "appreciation",
