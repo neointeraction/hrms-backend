@@ -60,6 +60,10 @@ const userSchema = new mongoose.Schema({
     ref: "Tenant",
     // Required for non-Super Admin users
   },
+  isFirstLogin: {
+    type: Boolean,
+    default: true,
+  },
   isSuperAdmin: {
     type: Boolean,
     default: false,

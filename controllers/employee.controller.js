@@ -302,6 +302,38 @@ exports.getEmployeeById = async (req, res) => {
 // Update Employee
 exports.updateEmployee = async (req, res) => {
   try {
+    // Auto-repair corrupt onboarding field if present (caused by previous frontend bug)
+    if (req.params.id) {
+      try {
+        console.log(
+          `[UpdateEmployee] Checking for corrupt data for ID: ${req.params.id}`
+        );
+        // Use native driver to bypass Mongoose schema validation failure
+        const result = await Employee.collection.updateOne(
+          {
+            _id: new mongoose.Types.ObjectId(req.params.id),
+            onboarding: { $type: "string" }, // corrupted as string
+          },
+          {
+            $set: {
+              onboarding: {
+                status: "Pending",
+                documents: [],
+                checklist: [],
+              },
+            },
+          }
+        );
+        if (result.modifiedCount > 0) {
+          console.log(
+            `[UpdateEmployee] FIXED corrupt onboarding data for ${req.params.id}`
+          );
+        }
+      } catch (e) {
+        console.warn("[UpdateEmployee] Auto-repair failed:", e);
+      }
+    }
+
     const existingEmployee = await Employee.findById(req.params.id);
     if (!existingEmployee) {
       return res.status(404).json({ message: "Employee not found" });
@@ -500,11 +532,18 @@ exports.getHierarchy = async (req, res) => {
     if (!req.user || !req.user.tenantId) {
       return res.status(400).json({ message: "No tenant context" });
     }
+    console.log(
+      "[getHierarchy] Fetching hierarchy for tenant:",
+      req.user.tenantId
+    );
 
     const employees = await Employee.find(
       {
         tenantId: req.user.tenantId, // Filter by tenant
         role: { $nin: ["Admin", "Super Admin"] },
+        employeeStatus: {
+          $in: ["Active", "Probation", "Notice Period", "On Leave"],
+        }, // Exclude Invited, Onboarding, etc.
       },
       {
         firstName: 1,
@@ -514,8 +553,14 @@ exports.getHierarchy = async (req, res) => {
         reportingManager: 1,
         employeeId: 1,
         role: 1,
+        employeeStatus: 1,
       }
     ).populate("reportingManager", "firstName lastName");
+    console.log("[getHierarchy] Found employees count:", employees.length);
+    console.log(
+      "[getHierarchy] Employee Statuses:",
+      employees.map((e) => `${e.firstName} ${e.lastName} (${e.employeeStatus})`)
+    );
     res.json(employees);
   } catch (err) {
     console.error(err);
@@ -531,7 +576,12 @@ exports.getDirectory = async (req, res) => {
     }
 
     const employees = await Employee.find(
-      { tenantId: req.user.tenantId },
+      {
+        tenantId: req.user.tenantId,
+        employeeStatus: {
+          $in: ["Active", "Probation", "Notice Period", "On Leave"],
+        },
+      },
       // Select ONLY safe fields
       {
         firstName: 1,
@@ -545,6 +595,7 @@ exports.getDirectory = async (req, res) => {
         reportingManager: 1,
         isOnline: 1, // Note: this is calculated below if needed, but schema doesn't have it persistent usually
         role: 1,
+        employeeStatus: 1,
       }
     )
       .populate("reportingManager", "firstName lastName")
@@ -838,13 +889,16 @@ exports.getEmployeeTimeline = async (req, res) => {
   }
 };
 
-// Delete Employee (Soft Delete usually, but here strict delete mechanism might be needed or status update)
+// Hard Delete Employee (Clean up for re-onboarding or mistake correction)
 exports.deleteEmployee = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const { id } = req.params;
     const employee = await Employee.findById(id);
 
     if (!employee) {
+      await session.abortTransaction();
       return res.status(404).json({ message: "Employee not found" });
     }
 
@@ -854,44 +908,49 @@ exports.deleteEmployee = async (req, res) => {
       req.user.tenantId &&
       employee.tenantId.toString() !== req.user.tenantId.toString()
     ) {
+      await session.abortTransaction();
       return res.status(403).json({ message: "Unauthorized access" });
     }
 
-    // Instead of hard delete, usually we set status to Terminated
-    // But if strictly requested:
-    // await Employee.findByIdAndDelete(id);
-    // await User.findByIdAndDelete(employee.user);
+    // 1. Delete Employee Record
+    await Employee.findByIdAndDelete(id).session(session);
 
-    // Let's assume status update for now, or if strict delete is needed:
-    // For now, let's implement soft delete / status change to "Terminated"
-    // or keep it as is if it was missing.
+    // 2. Delete Associated User Record (Critical for re-onboarding with same email)
+    if (employee.user) {
+      await User.findByIdAndDelete(employee.user).session(session);
+    }
 
-    // If implementation didn't exist, I'll add a simple one.
-    // If it *did* exist (I don't see it in the file view), I'll assume I'm adding it.
+    // 3. Decrement Tenant Count
+    const Tenant = require("../models/Tenant");
+    await Tenant.findByIdAndUpdate(
+      employee.tenantId,
+      { $inc: { "usage.employeeCount": -1 } },
+      { session }
+    );
 
-    employee.employeeStatus = "Terminated";
-    await employee.save();
-
-    await User.findByIdAndUpdate(employee.user, { status: "inactive" });
+    await session.commitTransaction();
 
     // Log Audit
     const { createAuditLog } = require("../utils/auditLogger");
     await createAuditLog({
       entityType: "Employee",
-      entityId: employee._id,
-      action: "delete", // Or 'terminate'
+      entityId: id,
+      action: "delete",
       performedBy: req.user.userId,
-      employee: employee._id,
       metadata: {
         name: `${employee.firstName} ${employee.lastName}`,
-        type: "termination",
+        email: employee.email,
+        description: "Hard deleted employee and associated user account",
       },
       tenantId: req.user.tenantId,
     });
 
-    res.json({ message: "Employee terminated successfully" });
+    res.json({ message: "Employee and user account deleted successfully" });
   } catch (err) {
-    console.error("Delete employee error:", err);
+    await session.abortTransaction();
+    console.error("Delete Employee Error:", err);
     res.status(500).json({ message: "Server error" });
+  } finally {
+    session.endSession();
   }
 };

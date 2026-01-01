@@ -63,4 +63,12 @@ router.get("/policy-status", auth, aiController.getPolicyStatus);
 // Chat Route (All users)
 router.post("/chat", auth, aiController.askQuestion);
 
+// Agent Route (Admin/HR only)
+router.post(
+  "/agent",
+  auth,
+  authorize(["Admin", "HR"]),
+  aiController.executeAgent
+);
+
 module.exports = router;

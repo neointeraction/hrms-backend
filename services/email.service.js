@@ -22,7 +22,7 @@ if (hasCredentials) {
   console.log("WARN: No EMAIL_USER/PASS set. Using MOCK email sender.");
 }
 
-exports.sendEmail = async ({ to, cc, subject, html }) => {
+exports.sendEmail = async ({ to, cc, subject, html, attachments = [] }) => {
   try {
     if (!to) {
       throw new Error("No recipient defined");
@@ -34,7 +34,12 @@ exports.sendEmail = async ({ to, cc, subject, html }) => {
       cc,
       subject,
       html, // using html for rich text support
+      attachments, // Array of { filename, content }
     };
+
+    // Fix: The arguments might be passed as an object.
+    // Let's rely on the destructured params in the function signature.
+    // We need to update the signature to include attachments.
 
     if (transporter) {
       const info = await transporter.sendMail(mailOptions);
@@ -46,7 +51,11 @@ exports.sendEmail = async ({ to, cc, subject, html }) => {
       console.log("[MOCK EMAIL] To:", to);
       console.log("[MOCK EMAIL] CC:", cc);
       console.log("[MOCK EMAIL] Subject:", subject);
-      console.log("[MOCK EMAIL] Body Preview:", html.substring(0, 100) + "...");
+      console.log("[MOCK EMAIL] Size:", html.length);
+      console.log(
+        "[MOCK EMAIL] Attachments:",
+        attachments ? attachments.length : 0
+      );
       console.log("---------------------------------------------------");
       return { success: true, messageId: "mock-" + Date.now() };
     }

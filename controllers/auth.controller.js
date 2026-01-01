@@ -191,6 +191,7 @@ exports.login = async (req, res) => {
         : null,
       isSuperAdmin: user.isSuperAdmin,
       isCompanyAdmin: user.isCompanyAdmin,
+      isFirstLogin: user.isFirstLogin || false,
       accessibleModules: [
         ...new Set(
           user.roles
@@ -301,6 +302,7 @@ exports.getMe = async (req, res) => {
         shiftId: employee?.shiftId || null, // Include shift information
         isSuperAdmin: user.isSuperAdmin || false,
         isCompanyAdmin: user.isCompanyAdmin || false,
+        isFirstLogin: user.isFirstLogin || false,
         theme: user.theme,
       },
       permissions: Array.from(permissions),
@@ -481,6 +483,18 @@ exports.resetPassword = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Acknowledge Welcome Screen
+exports.acknowledgeWelcome = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    await User.findByIdAndUpdate(userId, { isFirstLogin: false });
+    res.json({ success: true, message: "Welcome acknowledged" });
+  } catch (err) {
+    console.error("Acknowledge Welcome Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

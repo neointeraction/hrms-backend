@@ -77,6 +77,7 @@ const resignationRoutes = require("./routes/resignation.routes");
 app.use("/api/auth", authRoutes);
 app.use("/api/hr", hrRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/onboarding", require("./routes/onboarding.routes")); // New Onboarding routes
 app.use("/api/admin", adminRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/timesheet", timesheetRoutes);

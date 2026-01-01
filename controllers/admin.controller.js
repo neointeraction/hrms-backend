@@ -28,6 +28,9 @@ exports.deleteUser = async (req, res) => {
     // Delete associated employee record if it exists
     await Employee.deleteOne({ user: req.params.id });
 
+    // Delete the user record
+    await User.findByIdAndDelete(req.params.id);
+
     // Log Audit
     const { createAuditLog } = require("../utils/auditLogger");
     await createAuditLog({

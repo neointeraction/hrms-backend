@@ -39,7 +39,66 @@ Instructions:
   return response.text();
 };
 
+const axios = require("axios");
+
+// --- Agent Mode (REST API Bypass) ---
+const runAgent = async (message, toolsSchema = []) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  const payload = {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text:
+              "You are a helpful HR Assistant. USE TOOLS if needed. Query: " +
+              message,
+          },
+        ],
+      },
+    ],
+    tools: [
+      {
+        function_declarations: toolsSchema, // Note: snake_case for REST API
+      },
+    ],
+  };
+
+  try {
+    const response = await axios.post(url, payload);
+    const candidate = response.data.candidates?.[0];
+
+    // Log for debug
+    console.log("Gemini REST Response:", JSON.stringify(candidate, null, 2));
+
+    if (!candidate) return { type: "text", text: "No response from AI." };
+
+    const part = candidate.content?.parts?.[0];
+    if (part?.functionCall) {
+      return {
+        type: "function_call",
+        calls: [
+          {
+            name: part.functionCall.name,
+            args: part.functionCall.args,
+          },
+        ],
+      };
+    }
+
+    return { type: "text", text: part?.text || "No text." };
+  } catch (err) {
+    console.error("Gemini REST API Error:", err.response?.data || err.message);
+    return { type: "text", text: "Error communicating with AI service." };
+  }
+};
+
 module.exports = {
   initializeAI,
   generateResponse,
+  runAgent,
 };

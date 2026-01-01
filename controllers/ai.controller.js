@@ -1,6 +1,7 @@
 const PolicyDocument = require("../models/PolicyDocument");
 const Tenant = require("../models/Tenant");
 const aiService = require("../utils/ai.service");
+const aiTools = require("../utils/ai-tools");
 const fs = require("fs");
 const pdf = require("pdf-parse");
 
@@ -75,7 +76,7 @@ exports.uploadPolicy = async (req, res) => {
   }
 };
 
-// Ask Question to AI
+// Ask Question to AI (Policy Q&A)
 exports.askQuestion = async (req, res) => {
   try {
     const { question } = req.body;
@@ -142,6 +143,86 @@ exports.askQuestion = async (req, res) => {
     res
       .status(500)
       .json({ message: "Server error during AI processing: " + err.message });
+  }
+};
+
+// HR Agent Executor
+exports.executeAgent = async (req, res) => {
+  try {
+    const { command } = req.body;
+    if (!command) {
+      return res.status(400).json({ message: "Command is required" });
+    }
+
+    // 1. Run Initial AI Reasoning
+    const aiResponse = await aiService.runAgent(command, aiTools.tools);
+
+    if (aiResponse.type === "text") {
+      return res.json({ answer: aiResponse.text });
+    }
+
+    if (aiResponse.type === "function_call") {
+      // 2. Execute Function Calls
+      const results = [];
+      for (const call of aiResponse.calls) {
+        const fn = aiTools.toolFunctions[call.name];
+        if (fn) {
+          try {
+            console.log(
+              `[Agent] Executing tool: ${call.name} with args:`,
+              call.args
+            );
+            // Pass user context (req.user) to tools
+            const result = await fn(call.args, req.user); // req.user has { userId, tenantId, permissions }
+            results.push({
+              tool: call.name,
+              status: "success",
+              output: result,
+            });
+          } catch (err) {
+            console.error(`[Agent] Tool ${call.name} failed:`, err);
+            results.push({
+              tool: call.name,
+              status: "error",
+              error: err.message || JSON.stringify(err),
+            });
+          }
+        } else {
+          results.push({
+            tool: call.name,
+            status: "error",
+            error: "Tool not implemented",
+          });
+        }
+      }
+
+      // 3. Feed results back to AI for final summary
+      // For V1, we will just format the results nicely if we can't do multi-turn easily
+      // But let's try to ask AI to summarize.
+      const summaryPrompt = `
+        User Command: ${command}
+        
+        Tool Execution Results:
+        ${JSON.stringify(results, null, 2)}
+        
+        Please interpret these results and provide a friendly response to the user.
+        If there was an error, explain it.
+        If an action was successful, confirm it.
+        `;
+
+      // Use the simple generateResponse (Context + Question mode) but hijack it for summary
+      // Or reuse runAgent without tools to just generate text?
+      // Let's use runAgent without tools.
+      const finalResponse = await aiService.runAgent(summaryPrompt, []); // No tools for summary
+
+      return res.json({
+        answer: finalResponse.text,
+        actions: results, // transparency
+      });
+    }
+  } catch (err) {
+    console.error("Agent Execution Error:", err);
+    res.status(500).json({ message: "Agent error: " + err.message });
   }
 };
 
