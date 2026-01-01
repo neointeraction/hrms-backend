@@ -3,9 +3,16 @@ const path = require("path");
 const fs = require("fs");
 
 // Ensure upload directory exists
-const uploadDir = "uploads/";
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+let uploadDir = "uploads/";
+
+// Try to creating 'uploads/' directory. If it fails (read-only FS), use '/tmp'
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch (error) {
+  console.warn("Using /tmp/ due to filesystem restriction:", error.code);
+  uploadDir = "/tmp/";
 }
 
 // Storage Engine
