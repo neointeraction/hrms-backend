@@ -348,6 +348,18 @@ exports.updateEmployee = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
+    // Permission Check
+    const hasEditPermission = req.user.permissions?.includes("employees:edit");
+    const isOwner =
+      existingEmployee.user &&
+      existingEmployee.user.toString() === req.user.userId;
+
+    if (!hasEditPermission && !isOwner) {
+      return res
+        .status(403)
+        .json({ message: "Access denied: Insufficient permissions" });
+    }
+
     // Clean data - remove empty strings for ObjectId and enum fields
     const cleanedData = { ...req.body };
 

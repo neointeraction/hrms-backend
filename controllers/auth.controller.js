@@ -262,21 +262,12 @@ exports.getMe = async (req, res) => {
           ...new Set(
             user.roles
               ?.flatMap((r) => {
-                console.log(
-                  `[DEBUG] Role ${r.name} modules:`,
-                  r.accessibleModules
-                );
                 return r.accessibleModules || [];
               })
               .filter((m) => {
                 const limits = user.tenantId?.limits;
                 const enabled = limits?.enabledModules;
                 const isAllowed = !limits || !enabled || enabled.includes(m);
-                if (!isAllowed)
-                  console.log(
-                    `[DEBUG] Module ${m} filtered out by tenant limits:`,
-                    enabled
-                  );
                 return isAllowed;
               })
           ),

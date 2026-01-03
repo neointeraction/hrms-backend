@@ -83,7 +83,6 @@ router.get(
 );
 router.put(
   "/:id",
-  authorizePermission(["employees:edit"]),
   upload.single("profilePicture"),
   employeeController.updateEmployee
 );

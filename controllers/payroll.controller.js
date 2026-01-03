@@ -217,7 +217,7 @@ exports.getMyPayslips = async (req, res) => {
     })
       .populate(
         "employee",
-        "firstName lastName employeeId designation department bankDetails"
+        "firstName lastName employeeId designation department bankDetails dateOfJoining pan location"
       )
       .sort({ year: -1, month: -1 });
 
