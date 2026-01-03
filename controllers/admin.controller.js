@@ -106,7 +106,15 @@ exports.getRoles = async (req, res) => {
         "name description permissions accessibleModules mandatoryDocuments tenantId"
       )
       .populate("permissions");
-    res.json(roles);
+
+    // Deduplicate: Prioritize Tenant roles over Global roles
+    const roleMap = new Map();
+    // 1. Add Global roles first
+    roles.filter((r) => !r.tenantId).forEach((r) => roleMap.set(r.name, r));
+    // 2. Overwrite with Tenant roles
+    roles.filter((r) => r.tenantId).forEach((r) => roleMap.set(r.name, r));
+
+    res.json(Array.from(roleMap.values()));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -164,11 +172,6 @@ exports.updateRole = async (req, res) => {
     const { name, permissions, accessibleModules, mandatoryDocuments } =
       req.body;
 
-    console.log("[DEBUG] updateRole payload:", {
-      id: req.params.id,
-      name,
-      accessibleModules,
-    });
     const role = await Role.findOne({
       _id: req.params.id,
       tenantId: req.user.tenantId,

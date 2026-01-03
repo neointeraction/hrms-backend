@@ -64,6 +64,40 @@ exports.createProject = async (req, res) => {
   }
 };
 
+// Get Project Stats
+exports.getProjectStats = async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const totalProjects = await Project.countDocuments({ tenantId });
+    const activeProjects = await Project.countDocuments({
+      tenantId,
+      status: "Active",
+    });
+    const completedProjects = await Project.countDocuments({
+      tenantId,
+      status: "Completed",
+    });
+
+    // Count all tasks for this tenant
+    const Task = require("../models/Task");
+    const totalTasks = await Task.countDocuments({ tenantId });
+
+    res.json({
+      total: totalProjects,
+      active: activeProjects,
+      completed: completedProjects,
+      totalTasks: totalTasks,
+    });
+  } catch (error) {
+    console.error("Get project stats error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 // Get All Projects (with filters)
 exports.getProjects = async (req, res) => {
   try {
@@ -76,6 +110,24 @@ exports.getProjects = async (req, res) => {
     let matchStage = { tenantId: new mongoose.Types.ObjectId(tenantId) };
 
     if (status) matchStage.status = status;
+
+    // PROJECT ACCESS CONTROL
+    // Admins, HR, Project Managers see all projects.
+    // Others (Employees, Consultants, Interns) see only assigned projects.
+    const userRoles = req.user.roles || [];
+    // Allow Employees to see all projects for time tracking purposes
+    const canViewAll = userRoles.some((role) =>
+      ["Admin", "HR", "Project Manager", "Super Admin", "Employee"].includes(
+        role
+      )
+    );
+
+    if (!canViewAll) {
+      matchStage.$or = [
+        { members: new mongoose.Types.ObjectId(req.user.userId) },
+        { manager: new mongoose.Types.ObjectId(req.user.userId) },
+      ];
+    }
 
     const projects = await Project.aggregate([
       { $match: matchStage },

@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Designation = require("../models/Designation");
 
 // Get all designations for the tenant
@@ -14,6 +15,58 @@ exports.getDesignations = async (req, res) => {
     res.json(designations);
   } catch (err) {
     console.error("Get Designations Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get designation stats
+exports.getDesignationStats = async (req, res) => {
+  try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const tenantId = req.user.tenantId;
+
+    // Get designation counts
+    const totalDesignations = await Designation.countDocuments({ tenantId });
+    const activeDesignations = await Designation.countDocuments({
+      tenantId,
+      status: "active",
+    });
+    const inactiveDesignations = totalDesignations - activeDesignations;
+
+    // Get employee distribution by designation
+    // We need to aggregate on the Employee collection
+    // Assuming Employee model is 'Employee' and it has 'designationId'
+    const Employee = require("../models/Employee");
+
+    const employeeDistribution = await Employee.aggregate([
+      { $match: { tenantId: new mongoose.Types.ObjectId(tenantId) } }, // Ensure we only count current tenant
+      {
+        $group: {
+          _id: "$designationId", // Group by designationId
+          count: { $sum: 1 }, // Count employees
+        },
+      },
+    ]);
+
+    // Convert distribution to a map for easier frontend lookup { designationId: count }
+    const designationCounts = {};
+    employeeDistribution.forEach((item) => {
+      if (item._id) {
+        designationCounts[item._id.toString()] = item.count;
+      }
+    });
+
+    res.json({
+      total: totalDesignations,
+      active: activeDesignations,
+      inactive: inactiveDesignations,
+      designationCounts,
+    });
+  } catch (err) {
+    console.error("Get Designation Stats Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

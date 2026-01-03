@@ -16,6 +16,13 @@ router.get(
   designationController.getDesignations
 );
 
+// Get designation stats - Protected by "designations:view"
+router.get(
+  "/stats",
+  authorizePermission("designations:view"),
+  designationController.getDesignationStats
+);
+
 // Management routes - Protected by "designations:manage"
 router.post(
   "/",

@@ -13,6 +13,11 @@ router.post(
   projectController.createProject
 );
 router.get(
+  "/stats",
+  authorizePermission(["projects:view"]),
+  projectController.getProjectStats
+);
+router.get(
   "/",
   authorizePermission(["projects:view"]),
   projectController.getProjects

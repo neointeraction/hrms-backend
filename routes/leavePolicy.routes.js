@@ -31,6 +31,7 @@ router.get(
     "employee",
     "Intern",
     "Consultant",
+    "Contractor",
   ]),
   leavePolicyController.getPolicies
 ); // Employees might need to see available policies? Or maybe just backend uses it.

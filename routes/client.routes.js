@@ -8,6 +8,13 @@ const { authorizePermission } = require("../middleware/auth.middleware");
 // All routes are protected
 router.use(authenticateToken);
 
+// Get Client Stats
+router.get(
+  "/stats",
+  authorizePermission(["clients:view"]),
+  clientController.getClientStats
+);
+
 router.get(
   "/",
   authorizePermission(["clients:view"]),

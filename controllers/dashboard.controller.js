@@ -59,10 +59,6 @@ exports.getCEOStats = async (req, res) => {
     });
     const currentYear = new Date().getFullYear();
 
-    console.log(
-      `[CEO Stats] Querying Payroll for Tenant: ${tenantId}, Month: ${currentMonth}, Year: ${currentYear}`
-    );
-
     const payrolls = await Payroll.find({
       tenantId,
       month: currentMonth,
@@ -70,23 +66,18 @@ exports.getCEOStats = async (req, res) => {
       status: "Paid",
     }).populate("employee", "firstName lastName");
 
-    console.log(`[CEO Stats] Found ${payrolls.length} paid payrolls.`);
-
     const paymentOutflow = payrolls.reduce(
       (sum, p) => sum + (p.netSalary || 0),
       0
     );
 
     // 7. Project Distribution Chart
-    console.log(`[CEO Stats] Aggregating Projects for Tenant: ${tenantId}`);
 
     const projectDistribution = await Project.aggregate([
       { $match: { tenantId: new mongoose.Types.ObjectId(tenantId) } }, // Explicit cast
       { $group: { _id: "$status", count: { $sum: 1 } } },
       { $project: { name: "$_id", value: "$count", _id: 0 } },
     ]);
-
-    console.log("[CEO Stats] Project Distribution:", projectDistribution);
 
     res.json({
       totalEmployees,

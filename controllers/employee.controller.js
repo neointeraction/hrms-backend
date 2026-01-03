@@ -208,9 +208,6 @@ exports.getEmployees = async (req, res) => {
       return res.status(400).json({ message: "No tenant context" });
     }
 
-    console.log("[getEmployees] User:", req.user.userId);
-    console.log("[getEmployees] TenantId:", req.user.tenantId);
-
     const employees = await Employee.find({ tenantId: req.user.tenantId })
       .populate("user", "status roles")
       .populate("reportingManager", "firstName lastName")
@@ -236,13 +233,6 @@ exports.getEmployees = async (req, res) => {
       ...emp,
       isOnline: activeEmployeeIds.has(emp._id.toString()),
     }));
-
-    console.log(
-      "[getEmployees] Found",
-      employeesWithStatus.length,
-      "employees for tenant",
-      req.user.tenantId
-    );
 
     res.json(employeesWithStatus);
   } catch (err) {
@@ -299,15 +289,37 @@ exports.getEmployeeById = async (req, res) => {
   }
 };
 
+exports.getPublicProfile = async (req, res) => {
+  try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const employee = await Employee.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+    })
+      .select(
+        "firstName lastName designation department profilePicture email workPhone employeeId dateOfJoining reportingManager isOnline"
+      )
+      .populate("reportingManager", "firstName lastName");
+
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+    res.json(employee);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Update Employee
 exports.updateEmployee = async (req, res) => {
   try {
     // Auto-repair corrupt onboarding field if present (caused by previous frontend bug)
     if (req.params.id) {
       try {
-        console.log(
-          `[UpdateEmployee] Checking for corrupt data for ID: ${req.params.id}`
-        );
         // Use native driver to bypass Mongoose schema validation failure
         const result = await Employee.collection.updateOne(
           {
@@ -325,9 +337,6 @@ exports.updateEmployee = async (req, res) => {
           }
         );
         if (result.modifiedCount > 0) {
-          console.log(
-            `[UpdateEmployee] FIXED corrupt onboarding data for ${req.params.id}`
-          );
         }
       } catch (e) {
         console.warn("[UpdateEmployee] Auto-repair failed:", e);
@@ -532,10 +541,6 @@ exports.getHierarchy = async (req, res) => {
     if (!req.user || !req.user.tenantId) {
       return res.status(400).json({ message: "No tenant context" });
     }
-    console.log(
-      "[getHierarchy] Fetching hierarchy for tenant:",
-      req.user.tenantId
-    );
 
     const employees = await Employee.find(
       {
@@ -556,11 +561,7 @@ exports.getHierarchy = async (req, res) => {
         employeeStatus: 1,
       }
     ).populate("reportingManager", "firstName lastName");
-    console.log("[getHierarchy] Found employees count:", employees.length);
-    console.log(
-      "[getHierarchy] Employee Statuses:",
-      employees.map((e) => `${e.firstName} ${e.lastName} (${e.employeeStatus})`)
-    );
+
     res.json(employees);
   } catch (err) {
     console.error(err);
@@ -775,12 +776,17 @@ exports.getEmployeeTimeline = async (req, res) => {
 
       // Only show if date has passed or is today
       // if (probationEndDate <= new Date()) {
+      const isFuture = probationEndDate > new Date();
       timeline.push({
         type: "Probation",
         date: probationEndDate,
-        title: "Probation Completion",
-        description: "Successfully completed probation period",
-        icon: "CheckCircle",
+        title: isFuture
+          ? "Upcoming Probation Completion"
+          : "Probation Completion",
+        description: isFuture
+          ? "Scheduled completion of probation period"
+          : "Successfully completed probation period",
+        icon: isFuture ? "Clock" : "CheckCircle",
       });
       // }
 

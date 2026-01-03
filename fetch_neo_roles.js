@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Tenant = require("./models/Tenant");
 const Role = require("./models/Role");
+const Permission = require("./models/Permission"); // Required for population
 require("dotenv").config();
 
 const connectDB = async () => {
@@ -33,12 +34,19 @@ const fetchRoles = async () => {
 
     console.log(`Found Tenant: ${tenant.companyName} (${tenant._id})`);
 
-    const roles = await Role.find({ tenantId: tenant._id });
+    const roles = await Role.find({ tenantId: tenant._id }).populate(
+      "permissions"
+    );
 
     console.log("ROLES CONFIGURATION:");
     roles.forEach((r) => {
       console.log(
-        JSON.stringify({ name: r.name, accessibleModules: r.accessibleModules })
+        JSON.stringify({
+          name: r.name,
+          description: r.description,
+          accessibleModules: r.accessibleModules,
+          permissions: r.permissions.map((p) => p.name),
+        })
       );
     });
 

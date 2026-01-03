@@ -1,5 +1,34 @@
 const Client = require("../models/Client");
 
+// Get Client Stats
+exports.getClientStats = async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const totalClients = await Client.countDocuments({ tenantId });
+    const activeClients = await Client.countDocuments({
+      tenantId,
+      status: "Active",
+    });
+    const inactiveClients = totalClients - activeClients;
+
+    // Count projects that have a client assigned (assuming client name is stored in 'client' field)
+    const Project = require("../models/Project");
+    const totalProjects = await Project.countDocuments({
+      tenantId,
+      client: { $exists: true, $ne: "" },
+    });
+
+    res.json({
+      total: totalClients,
+      active: activeClients,
+      inactive: inactiveClients,
+      totalProjects,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get all clients (Tenant Scoped)
 exports.getClients = async (req, res) => {
   try {

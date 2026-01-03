@@ -4,6 +4,9 @@ const Employee = require("../models/Employee");
 const { createAuditLog } = require("../utils/auditLogger");
 
 const Leave = require("../models/Leave");
+const Timesheet = require("../models/Timesheet");
+const Project = require("../models/Project");
+const Task = require("../models/Task");
 
 // Clock In
 exports.clockIn = async (req, res) => {
@@ -106,6 +109,44 @@ exports.clockOut = async (req, res) => {
       timeEntry.completedTasks = req.body.completedTasks;
     }
     await timeEntry.save(); // Pre-save hook will calculate totalHours
+
+    // Auto-create Timesheet Entry if project/task provided
+    if (req.body.projectId && req.body.taskId) {
+      try {
+        const project = await Project.findById(req.body.projectId);
+        const task = await Task.findById(req.body.taskId);
+
+        if (project && task) {
+          // Format times
+          const formatTime = (date) => {
+            return date.toTimeString().slice(0, 5); // HH:mm
+          };
+
+          const timesheet = new Timesheet({
+            employee: employee._id,
+            tenantId: req.user.tenantId,
+            date: timeEntry.clockIn, // Use clock-in date
+            project: project.name,
+            projectId: project._id,
+            task: task.title,
+            taskId: task._id,
+            startTime: formatTime(timeEntry.clockIn),
+            endTime: formatTime(timeEntry.clockOut),
+            hours: timeEntry.totalHours, // Use calculated hours from timeEntry
+            description:
+              req.body.completedTasks || "Auto-generated from Clock Out",
+            status: "draft", // Default to draft for review
+            weekEnding: getWeekEnding(timeEntry.clockIn),
+            submittedAt: new Date(),
+          });
+
+          await timesheet.save();
+        }
+      } catch (tsError) {
+        console.error("Error auto-creating timesheet:", tsError);
+        // Don't fail the clock-out if timesheet fails, just log it
+      }
+    }
 
     // Audit log
     await createAuditLog({
@@ -337,3 +378,12 @@ exports.getTeamStatus = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+// Helper to get week ending date (Friday)
+function getWeekEnding(date) {
+  const result = new Date(date);
+  const day = result.getDay();
+  const diff = result.getDate() - day + (day === 0 ? -2 : 5); // Adjust to Friday
+  result.setDate(diff);
+  result.setHours(23, 59, 59, 999);
+  return result;
+}

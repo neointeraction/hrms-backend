@@ -69,6 +69,13 @@ router.get(
   employeeController.getEmployees
 );
 router.get("/me", employeeController.getEmployeeProfile);
+
+router.get(
+  "/public/:id",
+  authorizePermission(["employees:view", "organization:view"]),
+  employeeController.getPublicProfile
+);
+
 router.get(
   "/:id",
   authorizePermission(["employees:view"]),
