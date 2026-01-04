@@ -17,4 +17,11 @@ router.get(
   dashboardController.getCEOStats
 );
 
+router.get(
+  "/hr-stats",
+  authenticateToken,
+  authorize(["HR", "Admin", "Super Admin"]),
+  dashboardController.getHRStats
+);
+
 module.exports = router;

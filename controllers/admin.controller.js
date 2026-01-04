@@ -286,3 +286,52 @@ exports.getPermissions = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// Get System Health Stats
+exports.getSystemHealth = async (req, res) => {
+  try {
+    const Tenant = require("../models/Tenant");
+    const mongoose = require("mongoose");
+
+    // 1. Database Status
+    // 0: disconnected, 1: connected, 2: connecting, 3: disconnecting
+    const dbStatusMap = {
+      0: "Disconnected",
+      1: "Connected",
+      2: "Connecting",
+      3: "Disconnecting",
+    };
+    const dbState = mongoose.connection.readyState;
+    const dbStatus = dbStatusMap[dbState] || "Unknown";
+
+    // 2. Server Uptime
+    const uptime = process.uptime(); // in seconds
+
+    // 3. Plan Usage (Tenant)
+    let planStats = null;
+    if (req.user && req.user.tenantId) {
+      const tenant = await Tenant.findById(req.user.tenantId);
+      if (tenant) {
+        planStats = {
+          plan: tenant.plan,
+          limits: tenant.limits,
+          usage: tenant.usage,
+        };
+      }
+    }
+
+    // 4. Recent Errors (Placeholder)
+    const errorCount = 0;
+
+    res.json({
+      uptime,
+      dbStatus,
+      errorCount,
+      planStats,
+      timestamp: new Date(),
+    });
+  } catch (err) {
+    console.error("System Health Check Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

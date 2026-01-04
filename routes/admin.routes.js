@@ -51,4 +51,11 @@ router.delete(
 );
 router.get("/permissions", adminController.getPermissions); // Permissions list is public to authenticated users (or restrict to roles:view)
 
+// System Health (Admin Only)
+router.get(
+  "/system-health",
+  authorizePermission(["roles:view"]), // Re-using an admin-level permission
+  adminController.getSystemHealth
+);
+
 module.exports = router;

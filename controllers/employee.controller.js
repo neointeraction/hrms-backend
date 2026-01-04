@@ -599,6 +599,7 @@ exports.getDirectory = async (req, res) => {
       {
         firstName: 1,
         lastName: 1,
+        employeeId: 1,
         designation: 1,
         department: 1,
         email: 1,

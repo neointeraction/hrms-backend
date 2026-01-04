@@ -100,3 +100,46 @@ exports.getCEOStats = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+exports.getHRStats = async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    // 1. Pending Onboarding Requests (Status = Submitted, waiting for HR)
+    const pendingOnboarding = await Employee.countDocuments({
+      tenantId,
+      "onboarding.status": "Submitted",
+    });
+
+    // 2. New Joiners (This Month)
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const newJoiners = await Employee.countDocuments({
+      tenantId,
+      joiningDate: { $gte: startOfMonth },
+    });
+
+    // 3. Department Distribution
+    const departmentDist = await Employee.aggregate([
+      { $match: { tenantId: new mongoose.Types.ObjectId(tenantId) } },
+      { $group: { _id: "$department", count: { $sum: 1 } } },
+      { $project: { name: "$_id", value: "$count", _id: 0 } },
+    ]);
+
+    // Filter out null/undefined departments and ensure name exists
+    const cleanDist = departmentDist
+      .filter((d) => d.name)
+      .map((d) => ({ name: d.name, value: d.value }));
+
+    res.json({
+      pendingOnboarding,
+      newJoiners,
+      departmentDist: cleanDist,
+    });
+  } catch (error) {
+    console.error("HR Stats Error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
