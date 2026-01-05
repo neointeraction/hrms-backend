@@ -155,7 +155,6 @@ module.exports = {
       "organization",
     ],
     permissions: [
-      "employees:view",
       "leave:view",
       "leave:apply",
       "projects:view",
@@ -167,6 +166,7 @@ module.exports = {
       "my_journey:view",
       "organization:view",
       "organization:manage",
+      "employees:view",
     ],
   },
   HR: {
