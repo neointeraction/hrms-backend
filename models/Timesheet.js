@@ -50,6 +50,11 @@ const timesheetSchema = new mongoose.Schema(
       enum: ["draft", "submitted", "approved", "rejected"],
       default: "draft",
     },
+    entryType: {
+      type: String,
+      enum: ["manual", "timer"],
+      default: "manual",
+    },
     weekEnding: {
       type: Date,
       required: true,

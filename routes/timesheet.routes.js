@@ -11,6 +11,12 @@ router.post("/entry", timesheetController.createEntry);
 router.get("/entries", timesheetController.getEntries);
 router.put("/entry/:id", timesheetController.updateEntry);
 router.delete("/entry/:id", timesheetController.deleteEntry);
+router.post("/merge", timesheetController.mergeEntries);
+
+// Timer
+router.post("/clock-in", timesheetController.clockIn);
+router.post("/clock-out", timesheetController.clockOut);
+router.get("/active-timer", timesheetController.getActiveTimer);
 
 // Approval workflow
 router.post("/submit", timesheetController.submitTimesheets);

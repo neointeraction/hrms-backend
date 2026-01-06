@@ -84,6 +84,7 @@ exports.clockIn = async (req, res) => {
 
 // Clock Out
 exports.clockOut = async (req, res) => {
+  console.log("ClockOut Payload:", req.body);
   try {
     const { userId } = req.user;
 
@@ -110,42 +111,59 @@ exports.clockOut = async (req, res) => {
     }
     await timeEntry.save(); // Pre-save hook will calculate totalHours
 
-    // Auto-create Timesheet Entry if project/task provided
-    if (req.body.projectId && req.body.taskId) {
-      try {
+    // Auto-create Timesheet Entry
+    try {
+      if (req.body.projectId) {
         const project = await Project.findById(req.body.projectId);
-        const task = await Task.findById(req.body.taskId);
+        let task = null;
+        if (req.body.taskId) {
+          task = await Task.findById(req.body.taskId);
+        }
 
-        if (project && task) {
-          // Format times
-          const formatTime = (date) => {
-            return date.toTimeString().slice(0, 5); // HH:mm
-          };
-
+        if (project) {
           const timesheet = new Timesheet({
             employee: employee._id,
             tenantId: req.user.tenantId,
-            date: timeEntry.clockIn, // Use clock-in date
+            date: timeEntry.clockIn,
             project: project.name,
             projectId: project._id,
-            task: task.title,
-            taskId: task._id,
-            startTime: formatTime(timeEntry.clockIn),
-            endTime: formatTime(timeEntry.clockOut),
-            hours: timeEntry.totalHours, // Use calculated hours from timeEntry
+            task: task ? task.title : "General",
+            taskId: task ? task._id : undefined,
+            startTime: timeEntry.clockIn.toTimeString().slice(0, 5),
+            endTime: timeEntry.clockOut.toTimeString().slice(0, 5),
+            hours: timeEntry.totalHours,
             description:
               req.body.completedTasks || "Auto-generated from Clock Out",
-            status: "draft", // Default to draft for review
+            status: "draft",
             weekEnding: getWeekEnding(timeEntry.clockIn),
             submittedAt: new Date(),
+            entryType: "timer", // Added entryType
           });
-
           await timesheet.save();
         }
-      } catch (tsError) {
-        console.error("Error auto-creating timesheet:", tsError);
-        // Don't fail the clock-out if timesheet fails, just log it
+      } else {
+        // Create a General/Unassigned Timesheet Entry
+        const timesheet = new Timesheet({
+          employee: employee._id,
+          tenantId: req.user.tenantId,
+          date: timeEntry.clockIn,
+          project: "General", // Default string
+          task: "Daily Attendance", // Default string
+          // projectId and taskId left undefined as they are not required in Schema
+          startTime: timeEntry.clockIn.toTimeString().slice(0, 5),
+          endTime: timeEntry.clockOut.toTimeString().slice(0, 5),
+          hours: timeEntry.totalHours,
+          description:
+            req.body.completedTasks || "General work (Auto-generated)",
+          status: "draft",
+          weekEnding: getWeekEnding(timeEntry.clockIn),
+          submittedAt: new Date(),
+          entryType: "timer", // Added entryType
+        });
+        await timesheet.save();
       }
+    } catch (tsError) {
+      console.error("Error auto-creating timesheet:", tsError);
     }
 
     // Audit log

@@ -12,6 +12,17 @@ const timeEntrySchema = new mongoose.Schema(
       ref: "Tenant",
       required: true,
     },
+    project: String,
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+    },
+    task: String,
+    taskId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Task",
+    },
+    description: String,
     clockIn: {
       type: Date,
       required: true,
