@@ -13,25 +13,37 @@ router.use(authenticateToken);
 router.get(
   "/",
   authorizePermission(["shifts:view", "shifts:manage"]),
-  shiftController.getShifts
+  shiftController.getShifts,
 );
 
 router.post(
   "/",
   authorizePermission(["shifts:manage"]),
-  shiftController.createShift
+  shiftController.createShift,
 );
 
 router.put(
   "/:id",
   authorizePermission(["shifts:manage"]),
-  shiftController.updateShift
+  shiftController.updateShift,
 );
 
 router.delete(
   "/:id",
   authorizePermission(["shifts:manage"]),
-  shiftController.deleteShift
+  shiftController.deleteShift,
+);
+
+router.post(
+  "/:id/assign",
+  authorizePermission(["shifts:manage"]),
+  shiftController.assignEmployees,
+);
+
+router.post(
+  "/:id/remove",
+  authorizePermission(["shifts:manage"]),
+  shiftController.removeEmployees,
 );
 
 module.exports = router;

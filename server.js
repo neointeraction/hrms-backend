@@ -19,7 +19,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 app.use(express.json());
 
@@ -67,7 +67,6 @@ const employeeRoutes = require("./routes/employee.routes");
 const adminRoutes = require("./routes/admin.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
 const timesheetRoutes = require("./routes/timesheet.routes");
-const timeCorrectionRoutes = require("./routes/timeCorrection.routes");
 const auditRoutes = require("./routes/audit.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const aiRoutes = require("./routes/ai.routes");
@@ -81,7 +80,6 @@ app.use("/api/onboarding", require("./routes/onboarding.routes")); // New Onboar
 app.use("/api/admin", adminRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/timesheet", timesheetRoutes);
-app.use("/api/time-correction", timeCorrectionRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/leave", require("./routes/leave.routes"));
 app.use("/api/payroll", require("./routes/payroll.routes"));

@@ -43,7 +43,7 @@ exports.createEmployee = async (req, res) => {
 
     if (currentEmployeeCount >= tenant.limits.maxEmployees) {
       throw new Error(
-        `Employee limit reached for your ${tenant.plan} plan (${tenant.limits.maxEmployees} employees). Please upgrade your plan.`
+        `Employee limit reached for your ${tenant.plan} plan (${tenant.limits.maxEmployees} employees). Please upgrade your plan.`,
       );
     }
 
@@ -51,7 +51,7 @@ exports.createEmployee = async (req, res) => {
     const existingUser = await User.findOne({ email, tenantId });
     if (existingUser) {
       throw new Error(
-        "User with this email already exists in your organization"
+        "User with this email already exists in your organization",
       );
     }
 
@@ -171,7 +171,7 @@ exports.createEmployee = async (req, res) => {
       {
         $inc: { "usage.employeeCount": 1 },
       },
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -225,7 +225,7 @@ exports.getEmployees = async (req, res) => {
     }).select("employee");
 
     const activeEmployeeIds = new Set(
-      activeEntries.map((entry) => entry.employee.toString())
+      activeEntries.map((entry) => entry.employee.toString()),
     );
 
     // Add isOnline flag
@@ -300,7 +300,7 @@ exports.getPublicProfile = async (req, res) => {
       tenantId: req.user.tenantId,
     })
       .select(
-        "firstName lastName designation department profilePicture email workPhone employeeId dateOfJoining reportingManager isOnline"
+        "firstName lastName designation department profilePicture email workPhone employeeId dateOfJoining reportingManager isOnline",
       )
       .populate("reportingManager", "firstName lastName");
 
@@ -334,7 +334,7 @@ exports.updateEmployee = async (req, res) => {
                 checklist: [],
               },
             },
-          }
+          },
         );
         if (result.modifiedCount > 0) {
         }
@@ -443,7 +443,7 @@ exports.updateEmployee = async (req, res) => {
         ...cleanedData,
         modifiedBy: req.user ? req.user.id : null,
       },
-      { new: true }
+      { new: true },
     );
 
     if (!employee) {
@@ -493,7 +493,7 @@ exports.updateEmployee = async (req, res) => {
         });
       } else {
         console.warn(
-          `Role '${req.body.role}' not found in tenant ${tenantId}, User roles not updated`
+          `Role '${req.body.role}' not found in tenant ${tenantId}, User roles not updated`,
         );
       }
     }
@@ -571,7 +571,7 @@ exports.getHierarchy = async (req, res) => {
         employeeId: 1,
         role: 1,
         employeeStatus: 1,
-      }
+      },
     ).populate("reportingManager", "firstName lastName");
 
     res.json(employees);
@@ -609,8 +609,9 @@ exports.getDirectory = async (req, res) => {
         reportingManager: 1,
         isOnline: 1, // Note: this is calculated below if needed, but schema doesn't have it persistent usually
         role: 1,
+        user: 1,
         employeeStatus: 1,
-      }
+      },
     )
       .populate("reportingManager", "firstName lastName")
       .lean();
@@ -623,7 +624,7 @@ exports.getDirectory = async (req, res) => {
     }).select("employee");
 
     const activeEmployeeIds = new Set(
-      activeEntries.map((entry) => entry.employee.toString())
+      activeEntries.map((entry) => entry.employee.toString()),
     );
 
     const directory = employees.map((emp) => ({
@@ -662,7 +663,7 @@ exports.getUpcomingEvents = async (req, res) => {
         dateOfJoining: 1,
         profilePicture: 1,
         designation: 1,
-      }
+      },
     ).lean();
 
     const upcomingBirthdays = [];
@@ -700,7 +701,7 @@ exports.getUpcomingEvents = async (req, res) => {
         let nextAnniversary = new Date(
           currentYear,
           doj.getMonth(),
-          doj.getDate()
+          doj.getDate(),
         );
 
         if (nextAnniversary < today) {
@@ -944,7 +945,7 @@ exports.deleteEmployee = async (req, res) => {
     await Tenant.findByIdAndUpdate(
       employee.tenantId,
       { $inc: { "usage.employeeCount": -1 } },
-      { session }
+      { session },
     );
 
     await session.commitTransaction();

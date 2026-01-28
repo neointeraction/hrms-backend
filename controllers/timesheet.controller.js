@@ -143,7 +143,7 @@ exports.getEntries = async (req, res) => {
       const Project = require("../models/Project");
       // If client is passed as name
       const projects = await Project.find({ client: req.query.client }).select(
-        "_id"
+        "_id",
       );
       const projectIds = projects.map((p) => p._id);
 
@@ -188,15 +188,23 @@ exports.updateEntry = async (req, res) => {
       return res.status(404).json({ message: "Timesheet entry not found" });
     }
 
-    // Don't allow updating submitted or approved entries
-    if (entry.status === "approved" || entry.status === "submitted") {
+    // Don't allow updating approved entries
+    if (entry.status === "approved") {
       return res.status(400).json({
-        message: `Cannot update ${entry.status} entries`,
+        message: `Cannot update approved entries`,
       });
     }
 
     const oldValues = { ...entry.toObject() };
     Object.assign(entry, updates);
+
+    // If entry was submitted or rejected, reset to draft on edit so it can be re-submitted
+    if (entry.status === "submitted" || entry.status === "rejected") {
+      entry.status = "draft";
+      entry.submittedAt = undefined;
+      entry.rejectionReason = undefined;
+    }
+
     await entry.save();
 
     // Audit log
@@ -313,7 +321,7 @@ exports.submitTimesheets = async (req, res) => {
       {
         status: "submitted",
         submittedAt: new Date(),
-      }
+      },
     );
 
     // Trigger Notification to Manager
@@ -476,7 +484,7 @@ exports.rejectTimesheet = async (req, res) => {
         reviewedAt: new Date(),
         reviewComments: rejectionReason, // Set reviewComments for rejection
       },
-      { new: true }
+      { new: true },
     ).populate({
       path: "employee",
       populate: { path: "user" }, // Nested populate to get User ID
@@ -494,7 +502,7 @@ exports.rejectTimesheet = async (req, res) => {
           type: "TIMESHEET",
           title: `Timesheet ${status === "approved" ? "Approved" : "Rejected"}`,
           message: `Your timesheet for week ending ${new Date(
-            timesheet.weekEnding
+            timesheet.weekEnding,
           ).toLocaleDateString()} has been ${
             status === "approved" ? "approved" : "rejected"
           }.`,

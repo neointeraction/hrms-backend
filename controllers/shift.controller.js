@@ -1,12 +1,53 @@
 const Shift = require("../models/Shift");
 const Employee = require("../models/Employee");
 
+const mongoose = require("mongoose");
+
 // Get all shifts for the tenant
 exports.getShifts = async (req, res) => {
   try {
-    const shifts = await Shift.find({ tenantId: req.user.tenantId }).sort({
-      createdAt: -1,
-    });
+    const shifts = await Shift.aggregate([
+      { $match: { tenantId: new mongoose.Types.ObjectId(req.user.tenantId) } },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: "employees",
+          localField: "_id",
+          foreignField: "shiftId",
+          as: "employees",
+        },
+      },
+      {
+        $project: {
+          name: 1,
+          startTime: 1,
+          endTime: 1,
+          breakDuration: 1,
+          gracePeriod: 1,
+          workingDays: 1,
+          saturdayPolicy: 1,
+          status: 1,
+          tenantId: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          employees: {
+            $map: {
+              input: "$employees",
+              as: "emp",
+              in: {
+                _id: "$$emp._id",
+                firstName: "$$emp.firstName",
+                lastName: "$$emp.lastName",
+                profilePicture: "$$emp.profilePicture",
+                designation: "$$emp.designation",
+              },
+            },
+          },
+          employeeCount: { $size: "$employees" },
+        },
+      },
+    ]);
+
     res.json(shifts);
   } catch (err) {
     console.error(err);
@@ -102,7 +143,7 @@ exports.updateShift = async (req, res) => {
         workingDays,
         status,
       },
-      { new: true }
+      { new: true },
     );
 
     if (!shift) {
@@ -164,6 +205,54 @@ exports.deleteShift = async (req, res) => {
     });
 
     res.json({ message: "Shift deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Assign employees to shift
+exports.assignEmployees = async (req, res) => {
+  try {
+    const { employeeIds } = req.body;
+    const shiftId = req.params.id;
+
+    if (!employeeIds || !Array.isArray(employeeIds)) {
+      return res.status(400).json({ message: "Invalid employeeIds" });
+    }
+
+    await Employee.updateMany(
+      { _id: { $in: employeeIds }, tenantId: req.user.tenantId },
+      { $set: { shiftId: shiftId } },
+    );
+
+    res.json({ message: "Employees assigned successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Remove employees from shift
+exports.removeEmployees = async (req, res) => {
+  try {
+    const { employeeIds } = req.body;
+    const shiftId = req.params.id;
+
+    if (!employeeIds || !Array.isArray(employeeIds)) {
+      return res.status(400).json({ message: "Invalid employeeIds" });
+    }
+
+    await Employee.updateMany(
+      {
+        _id: { $in: employeeIds },
+        tenantId: req.user.tenantId,
+        shiftId: shiftId,
+      },
+      { $unset: { shiftId: "" } },
+    );
+
+    res.json({ message: "Employees removed successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });

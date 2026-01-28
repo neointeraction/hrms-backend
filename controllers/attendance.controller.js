@@ -216,7 +216,7 @@ exports.startBreak = async (req, res) => {
 
     // Check if already on break
     const activeBreak = timeEntry.breaks.find(
-      (b) => b.breakStart && !b.breakEnd
+      (b) => b.breakStart && !b.breakEnd,
     );
     if (activeBreak) {
       return res.status(400).json({ message: "Already on break" });
@@ -257,7 +257,7 @@ exports.endBreak = async (req, res) => {
 
     // Find active break
     const activeBreak = timeEntry.breaks.find(
-      (b) => b.breakStart && !b.breakEnd
+      (b) => b.breakStart && !b.breakEnd,
     );
     if (!activeBreak) {
       return res.status(400).json({ message: "No active break found" });
@@ -297,7 +297,7 @@ exports.getStatus = async (req, res) => {
 
     // Check if on break
     const activeBreak = activeEntry.breaks.find(
-      (b) => b.breakStart && !b.breakEnd
+      (b) => b.breakStart && !b.breakEnd,
     );
 
     res.json({
@@ -374,7 +374,7 @@ exports.getTeamStatus = async (req, res) => {
         if (activeEntry) {
           // Check if on break
           const activeBreak = activeEntry.breaks.find(
-            (b) => b.breakStart && !b.breakEnd
+            (b) => b.breakStart && !b.breakEnd,
           );
           status = activeBreak ? "on-break" : "clocked-in";
           clockInTime = activeEntry.clockIn;
@@ -387,7 +387,7 @@ exports.getTeamStatus = async (req, res) => {
           status,
           clockInTime,
         };
-      })
+      }),
     );
 
     res.json({ teamStatus });
