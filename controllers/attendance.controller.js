@@ -400,8 +400,8 @@ exports.getTeamStatus = async (req, res) => {
 function getWeekEnding(date) {
   const result = new Date(date);
   const day = result.getDay();
-  const diff = result.getDate() - day + (day === 0 ? -2 : 5); // Adjust to Friday
-  result.setDate(diff);
+  const diff = day === 0 ? 0 : 7 - day; // Adjust to next Sunday (or today if Sunday)
+  result.setDate(result.getDate() + diff);
   result.setHours(23, 59, 59, 999);
   return result;
 }

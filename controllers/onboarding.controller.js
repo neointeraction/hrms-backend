@@ -7,23 +7,19 @@ const crypto = require("crypto");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
-// 1. HR: Invite Employee
+// 1. HR: Invite Employee (Just create record, no email yet)
 exports.inviteEmployee = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    // ... imports
-    const { generateOfferLetter } = require("../utils/pdfGenerator");
-
-    // ... inside inviteEmployee
     const {
       firstName,
       lastName,
       email,
       role: roleName,
-      salary,
-      joiningDate,
+      salary, // Keep salary for Offer Letter generation later
       designation,
+      department, // Added department
     } = req.body;
     const tenantId = req.user.tenantId;
 
@@ -42,15 +38,12 @@ exports.inviteEmployee = async (req, res) => {
         existingEmp.onboarding.status === "Pending"
       ) {
         return res.status(400).json({
-          message: "Employee already invited. Resend invite instead.",
+          message:
+            "Employee already invited. You can send the onboarding link from Pending Requests.",
         });
       }
       throw new Error("Employee with this email already exists.");
     }
-
-    // Generate Token
-    const token = crypto.randomBytes(32).toString("hex");
-    const tokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     // Generate Temp Employee ID (e.g., INV-001)
     const tempId = `INV-${Date.now().toString().slice(-6)}`;
@@ -63,11 +56,12 @@ exports.inviteEmployee = async (req, res) => {
       lastName,
       email,
       role: roleName,
+      department,
+      designation,
+      salary, // Store salary for later
       employeeStatus: "Invited",
       onboarding: {
         status: "Pending",
-        token,
-        tokenExpires,
         checklist: [],
       },
       addedBy: req.user.userId,
@@ -75,62 +69,72 @@ exports.inviteEmployee = async (req, res) => {
 
     await newEmployee.save({ session });
 
-    // Generate Offer Letter
-    let attachments = [];
-    try {
-      const offerLetterBuffer = await generateOfferLetter(
-        { firstName, lastName, role: roleName },
-        { salary, joiningDate, designation },
-        {
-          name: tenant.name || tenant.companyName || "Our Company",
-          logo: tenant.settings?.logo, // Pass logo path
-        }
-      );
-
-      attachments.push({
-        filename: "Offer_Letter.pdf",
-        content: offerLetterBuffer,
-      });
-    } catch (pdfErr) {
-      console.error("Failed to generate Offer Letter:", pdfErr);
-      // Continue without attachment? Or fail? Let's log and continue for now, or maybe throw if critical.
-      // throw new Error("Failed to generate Offer Letter");
-    }
-
-    // ... create employee ...
-
-    // Send Email
-    const inviteLink = `${
-      process.env.FRONTEND_URL || "http://localhost:5173"
-    }/onboarding/start/${token}`;
-    await emailService.sendEmail({
-      to: email,
-      subject: "Welcome! Complete your Onboarding",
-      html: `
-        <h3>Welcome ${firstName},</h3>
-        <p>You have been invited to join <b>${
-          tenant.name || "our company"
-        }</b>.</p>
-        <p>We are excited to have you on board. Please find your Offer Letter attached.</p>
-        <p>To accept the offer and start your onboarding, please click the link below:</p>
-        <br/>
-        <a href="${inviteLink}" style="padding: 10px 20px; background: #8b5cf6; color: white; text-decoration: none; border-radius: 5px;">Start Onboarding</a>
-        <br/><br/>
-        <p>This link is valid for 7 days.</p>
-      `,
-      attachments,
-    });
-
     await session.commitTransaction();
-    res
-      .status(201)
-      .json({ message: "Invite sent successfully", employee: newEmployee });
+    res.status(201).json({
+      message: "Employee added to Pending Requests. No email sent yet.",
+      employee: newEmployee,
+    });
   } catch (err) {
     await session.abortTransaction();
     console.error("Invite Error:", err);
     res.status(500).json({ message: err.message });
   } finally {
     session.endSession();
+  }
+};
+
+// 1.5 HR: Send Onboarding Link (Manually triggered)
+exports.sendOnboardingLink = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const employee = await Employee.findOne({ _id: employeeId, tenantId });
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // Generate New Token
+    const token = crypto.randomBytes(32).toString("hex");
+    const tokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    employee.onboarding.token = token;
+    employee.onboarding.tokenExpires = tokenExpires;
+    // Update status if it was just "Pending" (invited)
+    if (employee.onboarding.status === "Pending") {
+      employee.onboarding.status = "In Progress"; // Or kept as Pending until they click?
+      // Let's keep status "In Progress" to show link was sent
+      employee.employeeStatus = "Onboarding";
+    }
+
+    await employee.save();
+
+    // Send Email
+    const tenant = await Tenant.findById(tenantId);
+    const inviteLink = `${
+      process.env.FRONTEND_URL || "http://localhost:5173"
+    }/onboarding/start/${token}`;
+
+    await emailService.sendEmail({
+      to: employee.email,
+      subject: "Action Required: Complete your Onboarding",
+      html: `
+        <h3>Welcome ${employee.firstName},</h3>
+        <p>You have been invited to join <b>${
+          tenant.name || "our company"
+        }</b>.</p>
+        <p>Please click the link below to provide your details and upload necessary documents:</p>
+        <br/>
+        <a href="${inviteLink}" style="padding: 10px 20px; background: #8b5cf6; color: white; text-decoration: none; border-radius: 5px;">Start Onboarding</a>
+        <br/><br/>
+        <p>This link is valid for 7 days.</p>
+      `,
+    });
+
+    res.json({ message: "Onboarding link sent successfully." });
+  } catch (err) {
+    console.error("Send Link Error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -142,7 +146,7 @@ exports.validateToken = async (req, res) => {
       "onboarding.token": token,
       "onboarding.tokenExpires": { $gt: Date.now() },
     }).select(
-      "firstName lastName email onboarding.status onboarding.currentStep onboarding.documents personalMobile dateOfBirth presentAddress pan aadhaar bankDetails"
+      "firstName lastName email onboarding.status onboarding.currentStep onboarding.documents personalMobile dateOfBirth presentAddress pan aadhaar bankDetails",
     );
 
     if (!employee) {
@@ -223,7 +227,7 @@ exports.saveOnboardingStep = async (req, res) => {
               `,
             });
             console.log(
-              `[Onboarding] Notification sent to HR: ${hrUser.email}`
+              `[Onboarding] Notification sent to HR: ${hrUser.email}`,
             );
           }
         }
@@ -279,17 +283,20 @@ exports.uploadDocument = async (req, res) => {
   }
 };
 
-// 5. Admin: Approve Onboarding
+// 5. Admin: Approve Onboarding & Activate
 exports.approveEmployee = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
+    const { generateOfferLetter } = require("../utils/pdfGenerator"); // Import here
     const { employeeId } = req.params;
     const employee = await Employee.findById(employeeId);
 
     if (!employee) throw new Error("Employee not found");
     if (employee.tenantId.toString() !== req.user.tenantId)
       throw new Error("Unauthorized");
+
+    const tenant = await Tenant.findById(req.user.tenantId);
 
     // Create User Account
     const existingUser = await User.findOne({ email: employee.email });
@@ -330,27 +337,81 @@ exports.approveEmployee = async (req, res) => {
     employee.user = newUser._id;
     employee.employeeStatus = "Probation"; // or Active
     employee.onboarding.status = "Approved";
-    employee.joiningDate = new Date(); // Set current date as joining? or use provided
+
+    // Set Joining Date to NOW (as per requirement: access after they join)
+    // Or we could have used a provided date if we had one, but user said "Cannot have joining date" in invite.
+    employee.joiningDate = new Date();
 
     await employee.save({ session });
 
-    // Send Activation Email
+    // Generate Offer Letter
+    let attachments = [];
+    try {
+      // Check if salary exists (handle 0 or string numbers)
+      const hasSalary =
+        employee.salary !== undefined &&
+        employee.salary !== null &&
+        employee.salary !== "";
+
+      if (hasSalary) {
+        console.log("Generating Offer Letter for:", employee.firstName);
+        const offerLetterBuffer = await generateOfferLetter(
+          {
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            role: employee.role,
+          },
+          {
+            salary: employee.salary,
+            designation: employee.designation,
+            joiningDate: employee.joiningDate,
+          },
+          {
+            name: tenant.name || tenant.companyName || "Our Company",
+            logo: tenant.settings?.logo,
+          },
+        );
+
+        attachments.push({
+          filename: "Offer_Letter.pdf",
+          content: offerLetterBuffer,
+        });
+      } else {
+        console.log(
+          "Skipping Offer Letter: No salary found for",
+          employee.email,
+        );
+      }
+    } catch (pdfErr) {
+      console.error("Failed to generate Offer Letter on approval:", pdfErr);
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+    // Send Activation Email with Offer Letter
     await emailService.sendEmail({
       to: employee.email,
-      subject: "Onboarding Approved - Account Details",
+      subject: "Welcome Aboard! Account Details & Offer Letter",
       html: `
-            <h3>Welcome Aboard, ${employee.firstName}!</h3>
-            <p>Your onboarding has been approved.</p>
+            <h3>Welcome to the team, ${employee.firstName}!</h3>
+            <p>Your onboarding has been approved and your account is active.</p>
+            
+            ${attachments.length > 0 ? "<p><b>Please find your Offer Letter attached.</b></p>" : ""}
+            
             <p>Here are your login credentials:</p>
             <p><b>Email:</b> ${employee.email}</p>
             <p><b>Password:</b> ${tempPassword}</p>
             <br/>
-            <a href="${process.env.FRONTEND_URL}/login">Login Here</a>
+            <a href="${frontendUrl}/login" style="padding: 10px 20px; background: #8b5cf6; color: white; text-decoration: none; border-radius: 5px;">Login to Portal</a>
         `,
+      attachments,
     });
 
     await session.commitTransaction();
-    res.json({ message: "Employee approved and user account created." });
+    res.json({
+      message:
+        "Employee approved, Offer Letter sent, and user account created.",
+    });
   } catch (err) {
     await session.abortTransaction();
     console.error("Approve Error:", err);
@@ -377,7 +438,7 @@ exports.rejectEmployee = async (req, res) => {
 
     // EXTEND TOKEN validity by 7 days to allow user to edit
     employee.onboarding.tokenExpires = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
     );
 
     await employee.save();

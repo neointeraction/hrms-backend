@@ -11,7 +11,14 @@ router.post(
   "/invite",
   authenticateToken,
   authorize(["Admin", "HR"]),
-  onboardingController.inviteEmployee
+  onboardingController.inviteEmployee,
+);
+
+router.post(
+  "/send-link/:employeeId",
+  authenticateToken,
+  authorize(["Admin", "HR"]),
+  onboardingController.sendOnboardingLink,
 );
 
 const upload = require("../middleware/upload.middleware");
@@ -22,7 +29,7 @@ router.post("/save/:token", onboardingController.saveOnboardingStep);
 router.post(
   "/upload/:token",
   upload.single("file"),
-  onboardingController.uploadDocument
+  onboardingController.uploadDocument,
 );
 
 const { extractTenant } = require("../middleware/tenant.middleware");
@@ -35,7 +42,7 @@ router.post(
   extractTenant, // Explicitly extract tenant context
   authorize(["Admin", "HR"]),
   limitsMiddleware.checkEmployeeLimit,
-  onboardingController.approveEmployee
+  onboardingController.approveEmployee,
 );
 
 router.post(
@@ -43,7 +50,7 @@ router.post(
   authenticateToken,
   extractTenant, // Explicitly extract tenant context
   authorize(["Admin", "HR"]),
-  onboardingController.rejectEmployee
+  onboardingController.rejectEmployee,
 );
 
 module.exports = router;

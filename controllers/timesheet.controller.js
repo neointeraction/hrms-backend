@@ -297,25 +297,20 @@ exports.submitTimesheets = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    // Find all draft timesheets for this week
-    const weekEnd = new Date(weekEnding);
+    // Find all draft timesheets (submit ALL drafts)
     const timesheets = await Timesheet.find({
       employee: employee._id,
-      weekEnding: weekEnd,
       status: "draft",
     });
 
     if (timesheets.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "No draft timesheets found for this week" });
+      return res.status(400).json({ message: "No draft timesheets found" });
     }
 
     // Update all to submitted
     await Timesheet.updateMany(
       {
         employee: employee._id,
-        weekEnding: weekEnd,
         status: "draft",
       },
       {
@@ -332,7 +327,7 @@ exports.submitTimesheets = async (req, res) => {
         title: "Timesheet Submitted",
         message: `${employee.firstName} ${
           employee.lastName
-        } has submitted timesheets for week ending ${weekEnd.toLocaleDateString()}.`,
+        } has submitted ${timesheets.length} timesheet entry/entries.`,
         relatedId: timesheets[0]._id, // Link to one of them or generic?
         tenantId: req.user.tenantId,
       });
@@ -347,7 +342,7 @@ exports.submitTimesheets = async (req, res) => {
         performedBy: userId,
         employee: employee._id,
         metadata: {
-          weekEnding: weekEnd,
+          weekEnding: timesheet.weekEnding,
           project: timesheet.project,
           hours: timesheet.hours,
         },
