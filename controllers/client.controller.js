@@ -1,4 +1,6 @@
 const Client = require("../models/Client");
+const Project = require("../models/Project");
+const Employee = require("../models/Employee");
 
 // Get Client Stats
 exports.getClientStats = async (req, res) => {
@@ -32,10 +34,53 @@ exports.getClientStats = async (req, res) => {
 // Get all clients (Tenant Scoped)
 exports.getClients = async (req, res) => {
   try {
-    const clients = await Client.find({ tenantId: req.user.tenantId }).sort({
-      createdAt: -1,
+    const clients = await Client.find({ tenantId: req.user.tenantId })
+      .sort({
+        createdAt: -1,
+      })
+      .lean(); // Use lean to easily modify the objects
+
+    // Map projects to find associated employees
+    const allProjects = await Project.find({
+      tenantId: req.user.tenantId,
+      status: { $ne: "Cancelled" }, // Exclude cancelled projects if desired
     });
-    res.json(clients);
+
+    const enrichedClients = await Promise.all(
+      clients.map(async (client) => {
+        // Find projects matching this client's name
+        const clientProjects = allProjects.filter(
+          (p) => p.client === client.name,
+        );
+
+        // Collect all unique user IDs from manager and members
+        const userIds = new Set();
+        clientProjects.forEach((p) => {
+          if (p.manager) userIds.add(p.manager.toString());
+          if (p.members && Array.isArray(p.members)) {
+            p.members.forEach((m) => userIds.add(m.toString()));
+          }
+        });
+
+        // Fetch Employee records for these user IDs
+        let associatedEmployees = [];
+        if (userIds.size > 0) {
+          associatedEmployees = await Employee.find({
+            user: { $in: Array.from(userIds) },
+            tenantId: req.user.tenantId,
+          })
+            .select("firstName lastName profilePicture designation")
+            .lean();
+        }
+
+        return {
+          ...client,
+          associatedEmployees,
+        };
+      }),
+    );
+
+    res.json(enrichedClients);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -92,7 +137,7 @@ exports.updateClient = async (req, res) => {
     const updatedClient = await Client.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId },
       { name, email, phone, address, status },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedClient) {

@@ -176,6 +176,139 @@ exports.applyLeave = async (req, res) => {
   }
 };
 
+// Update Leave
+exports.updateLeave = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, startDate, endDate, reason } = req.body;
+    const userId = req.user.userId;
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const employee = await Employee.findOne({ user: userId, tenantId });
+    if (!employee) {
+      return res.status(404).json({ message: "Employee profile not found" });
+    }
+
+    const leave = await Leave.findOne({
+      _id: id,
+      employee: employee._id,
+      tenantId,
+    });
+    if (!leave) {
+      return res.status(404).json({ message: "Leave request not found" });
+    }
+
+    if (leave.status !== "Pending") {
+      return res
+        .status(400)
+        .json({ message: "Only pending leaves can be updated" });
+    }
+
+    // Basic Validation
+    if (!startDate || !endDate || !reason) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Check for overlapping leaves excluding the current one
+    const overlappingLeave = await Leave.findOne({
+      _id: { $ne: id },
+      employee: employee._id,
+      status: { $ne: "Rejected" },
+      $or: [
+        {
+          startDate: { $lte: new Date(endDate) },
+          endDate: { $gte: new Date(startDate) },
+        },
+      ],
+    });
+
+    if (overlappingLeave) {
+      return res.status(400).json({
+        message: "You have an overlapping leave application during this period",
+      });
+    }
+
+    let totalDays;
+    const isHalfDay = req.body.isHalfDay === true;
+
+    if (isHalfDay) {
+      const start = new Date(startDate).setHours(0, 0, 0, 0);
+      const end = new Date(endDate).setHours(0, 0, 0, 0);
+
+      if (start !== end) {
+        return res.status(400).json({
+          message:
+            "Start date and End date must be the same for Half Day leave",
+        });
+      }
+      totalDays = 0.5;
+    } else {
+      totalDays = calculateTotalDays(startDate, endDate);
+    }
+
+    leave.type = type;
+    leave.startDate = new Date(startDate);
+    leave.endDate = new Date(endDate);
+    leave.reason = reason;
+    leave.isHalfDay = isHalfDay;
+    leave.totalDays = totalDays;
+
+    await leave.save();
+
+    res.json({ message: "Leave updated successfully", leave });
+  } catch (error) {
+    console.error("Update leave error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Cancel Leave
+exports.cancelLeave = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "No tenant context" });
+    }
+
+    const employee = await Employee.findOne({ user: userId, tenantId });
+    if (!employee) {
+      return res.status(404).json({ message: "Employee profile not found" });
+    }
+
+    const leave = await Leave.findOne({
+      _id: id,
+      employee: employee._id,
+      tenantId,
+    });
+    if (!leave) {
+      return res.status(404).json({ message: "Leave request not found" });
+    }
+
+    if (leave.status !== "Pending") {
+      return res
+        .status(400)
+        .json({ message: "Only pending leaves can be cancelled" });
+    }
+
+    leave.status = "Cancelled";
+    leave.workflowStatus = "Cancelled";
+
+    await leave.save();
+
+    res.json({ message: "Leave cancelled successfully", leave });
+  } catch (error) {
+    console.error("Cancel leave error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 // Get My Leaves
 exports.getMyLeaves = async (req, res) => {
   try {
@@ -281,7 +414,7 @@ exports.approveLeave = async (req, res) => {
         approved = true;
         // PM Approval Logic
         const employeeUser = await User.findById(
-          leave.employee.user._id
+          leave.employee.user._id,
         ).populate("roles");
         const employeeRoles = employeeUser
           ? employeeUser.roles.map((r) => r.name)
@@ -374,7 +507,7 @@ exports.updateLeaveStatus = async (req, res) => {
     const leave = await Leave.findOneAndUpdate(
       { _id: id, tenantId },
       { status, remarks },
-      { new: true }
+      { new: true },
     ).populate("employee");
 
     if (!leave) {
@@ -387,9 +520,9 @@ exports.updateLeaveStatus = async (req, res) => {
       type: "LEAVE",
       title: "Leave Request Updated",
       message: `Your leave request from ${new Date(
-        leave.startDate
+        leave.startDate,
       ).toLocaleDateString()} to ${new Date(
-        leave.endDate
+        leave.endDate,
       ).toLocaleDateString()} has been ${status}.`,
       relatedId: leave._id,
       tenantId, // Add tenantId
@@ -415,7 +548,7 @@ exports.rejectLeave = async (req, res) => {
     }
 
     const leave = await Leave.findOne({ _id: id, tenantId }).populate(
-      "employee"
+      "employee",
     );
     if (!leave) {
       return res.status(404).json({ message: "Leave request not found" });
@@ -435,7 +568,10 @@ exports.rejectLeave = async (req, res) => {
         canReject = true;
         actingRole = "Project Manager";
       }
-    } else if (leave.workflowStatus === "Pending HR") {
+    } else if (
+      leave.workflowStatus === "Pending HR" ||
+      leave.workflowStatus === "Pending Approval"
+    ) {
       if (isHR) {
         canReject = true;
         actingRole = "HR";
@@ -574,17 +710,23 @@ exports.getLeaveStats = async (req, res) => {
     const stats = Object.keys(leavePolicy).map((type) => {
       const approved =
         leaveStats.find(
-          (l) => l._id.type === type && l._id.status === "Approved"
+          (l) =>
+            l._id.type &&
+            l._id.type.toLowerCase() === type.toLowerCase() &&
+            l._id.status === "Approved",
         )?.totalDays || 0;
       const pendingApproval =
         leaveStats.find(
-          (l) => l._id.type === type && l._id.status === "Pending"
+          (l) =>
+            l._id.type &&
+            l._id.type.toLowerCase() === type.toLowerCase() &&
+            l._id.status === "Pending",
         )?.totalDays || 0;
 
       const used = approved;
       const reserved = pendingApproval;
-      // Balance = Total - Used (Approved) - Reserved (Pending)
-      const balance = Math.max(0, leavePolicy[type] - used - reserved);
+      // Balance = Total - Used (Approved). Pending is not deducted until Approved.
+      const balance = Math.max(0, leavePolicy[type] - used);
 
       return {
         type,
@@ -625,7 +767,7 @@ exports.getEmployeesOnLeave = async (req, res) => {
       endDate: { $gte: startOfDay },
     }).populate(
       "employee",
-      "firstName lastName _id profilePicture designation department"
+      "firstName lastName _id profilePicture designation department",
     );
 
     res.json(leaves);
@@ -658,7 +800,7 @@ exports.getHRLeaveOverview = async (req, res) => {
       23,
       59,
       59,
-      999
+      999,
     );
 
     // Build Query
@@ -705,7 +847,7 @@ exports.getHRLeaveOverview = async (req, res) => {
       // If we want to be robust, we can try to match either.
       // But typically filtering is by User ID in this app context.
       matchEmployee["employeeDetails.user"] = new mongoose.Types.ObjectId(
-        employee
+        employee,
       );
     }
 

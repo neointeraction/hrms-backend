@@ -38,7 +38,7 @@ const leaveSchema = new mongoose.Schema(
     reason: { type: String, required: true },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Rejected"],
+      enum: ["Pending", "Approved", "Rejected", "Cancelled"],
       default: "Pending",
     },
     workflowStatus: {
@@ -48,7 +48,7 @@ const leaveSchema = new mongoose.Schema(
     approvals: [approvalSchema],
     totalDays: { type: Number, required: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.models.Leave || mongoose.model("Leave", leaveSchema);

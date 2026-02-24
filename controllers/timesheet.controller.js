@@ -2,6 +2,8 @@ const Timesheet = require("../models/Timesheet");
 const Employee = require("../models/Employee");
 const TimeEntry = require("../models/TimeEntry");
 const { createAuditLog } = require("../utils/auditLogger");
+const Role = require("../models/Role");
+const User = require("../models/User");
 
 const Leave = require("../models/Leave");
 
@@ -333,6 +335,30 @@ exports.submitTimesheets = async (req, res) => {
       });
     }
 
+    // Trigger Notification to HR/Admin
+    const hrRoles = await Role.find({
+      name: { $in: ["HR", "Admin"] },
+      tenantId: req.user.tenantId,
+    });
+    const hrRoleIds = hrRoles.map((r) => r._id);
+    const hrUsers = await User.find({
+      roles: { $in: hrRoleIds },
+      tenantId: req.user.tenantId,
+    });
+
+    for (const hrUser of hrUsers) {
+      await createNotification({
+        recipient: hrUser._id,
+        type: "TIMESHEET",
+        title: "Timesheet Submitted (HR Review)",
+        message: `${employee.firstName} ${
+          employee.lastName
+        } has submitted ${timesheets.length} timesheet entry/entries.`,
+        relatedId: timesheets[0]._id,
+        tenantId: req.user.tenantId,
+      });
+    }
+
     // Audit log for submission
     for (const timesheet of timesheets) {
       await createAuditLog({
@@ -359,31 +385,56 @@ exports.submitTimesheets = async (req, res) => {
   }
 };
 
-// Get Pending Timesheet Approvals (for managers)
+// Get Pending Timesheet Approvals (for managers or HR)
 exports.getPendingApprovals = async (req, res) => {
   try {
     const { userId } = req.user;
+    const tenantId = req.user.tenantId;
 
-    // Find manager's employee record
-    const managerEmployee = await Employee.findOne({ user: userId });
-    if (!managerEmployee) {
-      return res.status(404).json({ message: "Employee not found" });
+    const user = await User.findById(userId).populate("roles");
+    const userRoles = user?.roles.map((r) => r.name) || [];
+    const isHR =
+      userRoles.includes("HR") ||
+      userRoles.includes("Admin") ||
+      user.isCompanyAdmin;
+
+    let pendingTimesheets = [];
+
+    if (isHR) {
+      // HR sees all pending timesheets in tenant
+      // We first find all employees in tenant
+      const tenantEmployees = await Employee.find({ tenantId }).select("_id");
+      const employeeIds = tenantEmployees.map((e) => e._id);
+
+      pendingTimesheets = await Timesheet.find({
+        employee: { $in: employeeIds },
+        status: "submitted",
+      })
+        .populate("employee", "firstName lastName employeeId")
+        .sort({ submittedAt: -1 });
+    } else {
+      // Find manager's employee record
+      const managerEmployee = await Employee.findOne({ user: userId });
+      if (!managerEmployee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+
+      // Find all employees reporting to this manager
+      const reportingEmployees = await Employee.find({
+        reportingManager: managerEmployee._id,
+        tenantId,
+      }).select("_id");
+
+      const employeeIds = reportingEmployees.map((e) => e._id);
+
+      // Get submitted timesheets from these employees
+      pendingTimesheets = await Timesheet.find({
+        employee: { $in: employeeIds },
+        status: "submitted",
+      })
+        .populate("employee", "firstName lastName employeeId")
+        .sort({ submittedAt: -1 });
     }
-
-    // Find all employees reporting to this manager
-    const reportingEmployees = await Employee.find({
-      reportingManager: managerEmployee._id,
-    }).select("_id");
-
-    const employeeIds = reportingEmployees.map((e) => e._id);
-
-    // Get submitted timesheets from these employees
-    const pendingTimesheets = await Timesheet.find({
-      employee: { $in: employeeIds },
-      status: "submitted",
-    })
-      .populate("employee", "firstName lastName employeeId")
-      .sort({ submittedAt: -1 });
 
     res.json({ timesheets: pendingTimesheets });
   } catch (error) {

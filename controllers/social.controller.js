@@ -3,7 +3,7 @@ const Comment = require("../models/Comment");
 const Notification = require("../models/Notification"); // For mentions
 const User = require("../models/User"); // For finding usage by name if needed
 const Employee = require("../models/Employee"); // Need this to verify authors
-const cloudinary = require("../config/cloudinary");
+const { cloudinary } = require("../config/cloudinary");
 const fs = require("fs");
 
 // Get Social Feed
@@ -25,7 +25,7 @@ exports.getFeed = async (req, res) => {
       .limit(parseInt(limit))
       .populate(
         "author",
-        "firstName lastName profilePicture designation employeeId"
+        "firstName lastName profilePicture designation employeeId",
       )
       .populate("reactions.user", "firstName lastName employeeId")
       .populate({
@@ -69,7 +69,7 @@ exports.createPost = async (req, res) => {
     // Populate author for immediate display on frontend
     await newPost.populate(
       "author",
-      "firstName lastName profilePicture designation employeeId"
+      "firstName lastName profilePicture designation employeeId",
     );
 
     res
@@ -139,7 +139,7 @@ exports.updatePost = async (req, res) => {
     // Re-populate for frontend consistency
     await post.populate(
       "author",
-      "firstName lastName profilePicture designation employeeId"
+      "firstName lastName profilePicture designation employeeId",
     );
     await post.populate("reactions.user", "firstName lastName employeeId");
 
@@ -201,7 +201,7 @@ exports.toggleReaction = async (req, res) => {
 
     // Check if user already reacted
     const existingReactionIndex = post.reactions.findIndex(
-      (r) => r.user.toString() === employee._id.toString()
+      (r) => r.user.toString() === employee._id.toString(),
     );
 
     if (existingReactionIndex > -1) {
@@ -246,7 +246,7 @@ exports.votePoll = async (req, res) => {
     if (!post.pollData.allowMultiple) {
       post.pollData.options.forEach((opt) => {
         const voteIdx = opt.votes.findIndex(
-          (v) => v.toString() === employee._id.toString()
+          (v) => v.toString() === employee._id.toString(),
         );
         if (voteIdx > -1) opt.votes.splice(voteIdx, 1);
       });
@@ -262,7 +262,7 @@ exports.votePoll = async (req, res) => {
       return res.status(400).json({ message: "Invalid option" });
 
     const existingVote = targetOption.votes.find(
-      (v) => v.toString() === employee._id.toString()
+      (v) => v.toString() === employee._id.toString(),
     );
     if (!existingVote) {
       targetOption.votes.push(employee._id);
@@ -351,7 +351,7 @@ exports.toggleCommentReaction = async (req, res) => {
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
     const existingReactionIndex = comment.reactions.findIndex(
-      (r) => r.user.toString() === employee._id.toString()
+      (r) => r.user.toString() === employee._id.toString(),
     );
 
     if (existingReactionIndex > -1) {
